@@ -38,6 +38,9 @@ export default async function CardReview({
       item.frontmatter.review_count >= 1 &&
       item.frontmatter.review_status === "reviewed");
 
+  // Active recall: re-reviews test recall by default; ?mode=recall forces it.
+  const recallMode = params.mode === "recall" || isReReview;
+
   const nextForAction = nextPath
     ? `/review/card?path=${encodeURIComponent(nextPath)}${isReReview ? "&mode=rereview" : ""}`
     : "/review";
@@ -125,6 +128,7 @@ export default async function CardReview({
         aiInsight={aiInsight}
         insightParagraphs={insightParagraphs}
         isLoggedIn={isLoggedIn}
+        recallMode={recallMode}
       />
 
       {/* Source Context */}
