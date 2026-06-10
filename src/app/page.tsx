@@ -27,6 +27,12 @@ export default async function Home() {
             home
           </Link>
           <Link
+            href="/write"
+            className="text-muted hover:text-foreground transition-colors"
+          >
+            write
+          </Link>
+          <Link
             href="/review"
             className="text-muted hover:text-foreground transition-colors"
           >
