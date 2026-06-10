@@ -133,6 +133,27 @@ Books / Articles / Podcasts
 | `/review` | Private | Review queue dashboard |
 | `/review/card` | Private | Card-based, Kindle-friendly review |
 
+## Recall API
+
+Recall is the point — so the spaced-repetition data is exposed as a small read-only JSON API you can plug into any workflow (a morning email, a Slack bot, a terminal card, an LLM that quizzes you). Set `RECAP_TOKEN` and pass it as a bearer token (or `?token=`).
+
+| Endpoint | Returns |
+|----------|---------|
+| `GET /api/recap/today` | Items **due** for review today + a couple of random reviewed concepts to rediscover |
+| `GET /api/recap/random?n=3&type=concept\|idea` | N random reviewed items |
+
+Both accept `?format=json` (default), `text`, or `md`. Unset `RECAP_TOKEN` → the endpoints `503` (never serve review data open by default).
+
+```bash
+# today's recall as a plain-text digest (drop into a cron → email/Slack)
+curl -H "Authorization: Bearer $RECAP_TOKEN" \
+  "https://your-app.vercel.app/api/recap/today?format=text"
+
+# pipe 3 random ideas into Claude to generate active-recall questions
+curl -s "https://your-app.vercel.app/api/recap/random?n=3&type=idea&token=$RECAP_TOKEN" \
+  | claude -p "Quiz me on these — one question each, don't show the answers yet."
+```
+
 ## Key design decisions
 
 - **AI extracts, human reviews.** Every idea starts `unreviewed`. The human is the bottleneck on purpose — internalization requires friction.
