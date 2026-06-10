@@ -1,0 +1,18 @@
+# Secrets — NEVER commit these (the sync repo is private, but be safe anyway)
+.env
+.env.*
+*.key
+*.pem
+secrets/
+
+# OS files
+.DS_Store
+.Trash/
+
+# Obsidian workspace (local UI state, not worth versioning)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache/
+
+# Git plugin internal
+.obsidian/plugins/obsidian-git/data.json
