@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import { listFiles, getFilesContent } from "./github";
 import { parseFrontmatter, extractTitle } from "./parser";
 
@@ -106,8 +107,17 @@ export function sample<T>(arr: T[], n: number): T[] {
     .map((x) => x.value);
 }
 
+// Constant-time string compare (avoids a timing side-channel on the token).
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return timingSafeEqual(ab, bb);
+}
+
 // Token check for the Recall API. Returns "unconfigured" when RECAP_TOKEN is
 // unset (the endpoint should 503 — never serve private review data by default).
+// Prefer the Authorization: Bearer header; ?token= works but can leak via logs.
 export function recapAuth(
   authHeader: string | null,
   queryToken: string | null
@@ -115,7 +125,10 @@ export function recapAuth(
   const token = process.env.RECAP_TOKEN;
   if (!token) return "unconfigured";
   const bearer = authHeader?.replace(/^Bearer\s+/i, "") ?? null;
-  return bearer === token || queryToken === token ? "ok" : "denied";
+  const ok =
+    (bearer !== null && safeEqual(bearer, token)) ||
+    (queryToken !== null && safeEqual(queryToken, token));
+  return ok ? "ok" : "denied";
 }
 
 // Render a list of labelled sections as a plain-text or markdown digest.
