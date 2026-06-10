@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Crimson_Pro, Cormorant_Garamond } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const crimson = Crimson_Pro({
@@ -39,6 +40,7 @@ export default function RootLayout({
         <main className="flex-auto min-w-0 flex flex-col px-4 md:px-0">
           <section className="w-full max-w-2xl mx-auto py-8">{children}</section>
         </main>
+        <Analytics />
       </body>
     </html>
   );
