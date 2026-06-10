@@ -1,86 +1,129 @@
 # Building a Second Brain
 
-A system for turning what I read into what I think -- and eventually, what I write.
+**Turn everything you read, watch, and hear into a living, interconnected knowledge graph — with AI doing the extraction and you doing the thinking.**
 
-I read books, listen to podcasts, and collect articles. An AI pipeline extracts atomic ideas from each source, synthesizes them into cross-source concepts, and surfaces them for spaced repetition review. I review everything, edit what matters, and write from the compounded knowledge.
+An open-source pipeline + web app that ingests books, podcasts, and articles, uses an LLM to pull out atomic ideas, links them into cross-source concepts, and resurfaces them for spaced-repetition review. You stay the bottleneck on purpose: AI extracts, you review, knowledge compounds.
 
-**Live:** [secondbrain.heqinghuang.com](https://secondbrain.heqinghuang.com)
+[![Live demo](https://img.shields.io/badge/demo-second-brain.heqinghuang.com-2563eb)](https://second-brain.heqinghuang.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 
-## The Pipeline
+**▶ Live demo:** [second-brain.heqinghuang.com](https://second-brain.heqinghuang.com) — a real second brain built from 150+ books.
+
+<!-- screenshots:start -->
+<p align="center">
+  <img src="./docs/screenshot-graph.png" alt="Knowledge graph homepage with pipeline diagram and force-directed graph" width="780"><br>
+  <em>The homepage: the pipeline diagram, live stats, and a force-directed graph of every concept.</em>
+</p>
+<p align="center">
+  <img src="./docs/screenshot-concept.png" alt="A concept page synthesizing tensions across multiple sources" width="780"><br>
+  <em>A concept page — one definition, the tensions between sources (Rumelt, Housel, Taleb), and links out. The cross-source synthesis is the whole point.</em>
+</p>
+<!-- screenshots:end -->
+
+---
+
+## Why this exists
+
+You read a great book. Three months later you remember… that it was good. The highlights rot in an app you never reopen. **Reading without a system is entertainment, not learning.**
+
+This is a system. It's not a read-later app and not a note-taking app — it's a pipeline that turns consumption into a compounding asset:
+
+- **AI does the tedious part** (reading every highlight, pulling out the atomic ideas) so you can do the valuable part (judging, connecting, internalizing).
+- **Nothing counts until you review it.** Every AI-generated idea starts `unreviewed`. Friction is the feature — internalization requires it.
+- **Knowledge connects across sources.** A concept like *negotiation* pulls from 7 different books and podcasts. The graph gets denser with everything you consume.
+- **It's yours and it's free.** Self-hosted, MIT-licensed, your data in your own private repo. Think *Obsidian Publish + an AI research assistant + Anki*, without the subscriptions.
+
+## How it works
 
 ```
- Read              Extract            Synthesize          Write
- ----              -------            ----------          -----
- Kindle books  -->  Atomic        -->  Concept       -->  Published
- Podcasts           ideas              pages               essays
- Articles           (AI-generated)     (cross-source)     (human voice)
+ Read              Extract            Synthesize          Review            Write
+ ----              -------            ----------          ------            -----
+ Books         -->  Atomic        -->  Concept       -->  Spaced       -->  Published
+ Podcasts           ideas              pages              repetition         essays
+ Articles           (AI-generated)     (cross-source)     (you approve)     (your voice)
 ```
 
-**Sources go in. Ideas come out. Concepts compound. Writing happens.**
+**Sources go in. Ideas come out. Concepts compound. You review. Writing happens.**
 
-Every idea links back to its source. Every concept pulls from multiple sources. The graph grows denser with each book I read.
+1. **Capture** — Drop a URL, a file, or a thought to Claude Code. It fetches the full content into an immutable `10 Notes/` source (Kindle highlights, YouTube transcripts via `yt-dlp`, articles as markdown).
+2. **Extract** — An LLM reads the source and pulls 3–10 atomic ideas — one idea per file, each with a direct quote or timestamp back to the original.
+3. **Review** — Every AI idea lands `unreviewed`. You approve, contest, or edit. Approved ideas enter a Leitner spaced-repetition cycle (Easy 3× / Medium 2× / Hard 1× interval scaling, capped at 180 days).
+4. **Synthesize** — Ideas link into lean concept hub-nodes: a one-sentence definition, the tensions between sources, links to related concepts.
+5. **Write** — Original essays in your voice, informed by the concept graph but never generated from it.
 
-## How It Works
+## Get started — build your own
 
-### 1. Capture
-Raw sources land in an Obsidian vault and are never modified. Kindle highlights sync automatically. Podcast transcripts are pulled via yt-dlp. Articles are fetched as markdown.
+Two pieces: **the vault** (your knowledge, an Obsidian folder synced to a private GitHub repo) and **the web app** (this repo, the public viewer + private review UI).
 
-### 2. Extract
-An LLM reads each source and pulls 3-10 atomic ideas -- one idea per file, with a direct quote or timestamp linking back to the original.
+### 1. Set up your vault (the pipeline)
 
-### 3. Review
-I review every AI-generated idea before it counts. Approve, contest, or edit. Approved ideas enter a spaced repetition cycle (Leitner system: Easy 3x / Medium 2x / Hard 1x interval scaling, capped at 180 days). Nothing gets marked "reviewed" without me reading it.
+The [`vault-template/`](./vault-template) folder is a ready-to-go starter vault with the full pipeline baked in.
 
-### 4. Synthesize
-Concepts are lean hub nodes -- a one-sentence definition, tensions between sources, and links to related concepts. A concept like "decision" pulls from 7 different books and podcasts.
+```bash
+# copy the template somewhere as your vault, then open it in Obsidian
+cp -R vault-template ~/my-second-brain
+```
 
-### 5. Write
-Original essays are written in my voice, informed by the concept graph but never generated from it. Published at [heqinghuang.com](https://heqinghuang.com).
+- `CLAUDE.md` — the extraction/synthesis/review pipeline Claude Code runs. Customize the **Topic Vocabulary** to your domains.
+- `ISA.md` + `sync.sh` — auto-sync the vault to a **private** GitHub repo via PR (handles the headless-`gh` token + macOS Full Disk Access gotchas for you).
+- `00 Meta/` — schema, templates, and a Dataview review dashboard.
 
-## What's Extracted So Far
+Open the vault in Claude Code and say *"extract Atomic Habits"* or paste a URL. See [`vault-template/README.md`](./vault-template/README.md) for the full walkthrough.
 
-**Books:** Atomic Habits, Never Split the Difference, Getting Things Done, Good Strategy Bad Strategy, The Psychology of Money, Skin in the Game, Essentialism, Four Thousand Weeks, Who Really Matters, Cheatsheet for Life, Who - A Method for Hiring, The Cold Start Problem
+### 2. Deploy the web app (the viewer)
 
-**Podcasts (3):** Jensen Huang on Dwarkesh Patel, Ferrari on Acquired, on Xiaoyuzhou FM
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fh3qing%2Fbuilding-a-second-brain&env=GITHUB_TOKEN,GITHUB_REPO_OWNER,GITHUB_REPO_NAME,AUTH_PIN_HASH,REVALIDATE_SECRET&envDescription=GitHub%20token%20%2B%20your%20private%20vault%20repo%20%2B%20a%20review%20PIN)
 
-**Concepts (50):** decision, strategy, clarity, focus, habits, identity, trust, negotiation, leadership, productivity, scarcity, brand, grief, happiness, growth, relationships, and 34 more
+Or run it locally:
 
-## Key Design Decisions
+```bash
+git clone https://github.com/h3qing/building-a-second-brain.git
+cd building-a-second-brain
+npm install
+cp .env.example .env.local   # then fill in the values below
+npm run dev
+```
 
-- **AI extracts, human reviews.** Every idea starts as `unreviewed`. The human is the bottleneck on purpose -- internalization requires friction.
-- **Atomic ideas, not summaries.** Each idea file is one insight, not a book summary. This makes cross-source synthesis possible.
-- **Concepts are hub nodes, not content pages.** Backlinks do the heavy lifting. Concept pages stay under 20 lines.
-- **Sources are immutable.** Raw notes are never modified after capture. The extracted layer is where interpretation lives.
-- **Spaced repetition for retention.** Reviewed ideas resurface on a schedule so knowledge compounds instead of fading.
+```bash
+GITHUB_TOKEN=ghp_...              # repo scope, to read your private vault
+GITHUB_REPO_OWNER=your-username
+GITHUB_REPO_NAME=your-vault-repo
+AUTH_PIN_HASH=$2b$10$...          # node -e "require('bcryptjs').hash('your-pin', 10).then(console.log)"
+REVALIDATE_SECRET=your-secret
+```
+
+The app reads your vault's `main` branch live via the GitHub API and renders it per-request — merge a sync PR and the site updates. Public pages show the graph; `/review` is PIN-gated for you.
 
 ## Architecture
 
 ```
-Kindle / Articles / Podcasts
+Books / Articles / Podcasts
         |
         v
-  Obsidian Vault (iCloud)        Claude Code extracts atomic ideas
+  Obsidian Vault                 Claude Code runs the pipeline
   10 Notes/  (raw sources)  ---> 20 Ideas/  (one idea per file)
   00 Meta/   (schema + log)      30 Concept/ (cross-source wiki)
         |                               |
         v                               v
-     GitHub (private repo)        secondbrain.heqinghuang.com
-        ^                          /            \
-        |                      PUBLIC        PRIVATE
-        +--- review decisions   Graph +      Review queue
-             committed back     Feed         on Kindle
+   GitHub (private repo)          second-brain.heqinghuang.com
+        ^   auto-synced via PR     /            \
+        |                      PUBLIC          PRIVATE
+        +--- review decisions   Graph +        Review queue
+             committed back      Feed          (PIN-gated)
 ```
 
 | Layer | What | Tech |
 |-------|------|------|
-| Source of truth | Obsidian vault in iCloud | Markdown + YAML frontmatter |
-| AI pipeline | Extraction, synthesis, spaced repetition | Claude Code |
-| Sync | Auto-push to GitHub (hourly cron) | Git + cron |
+| Source of truth | Obsidian vault | Markdown + YAML frontmatter |
+| AI pipeline | Extraction, synthesis, spaced repetition | Claude Code + `CLAUDE.md` |
+| Sync | Auto-push to GitHub via PR | Git (detached work-tree) + cron/launchd |
 | Web app | Public graph + private review | Next.js 15, Vercel |
 | Data | Read vault, write review decisions | GitHub REST API |
 | Auth | PIN-protected review pages | bcrypt + HMAC sessions |
 
-## Pages
+### Pages
 
 | Route | Access | Purpose |
 |-------|--------|---------|
@@ -88,64 +131,28 @@ Kindle / Articles / Podcasts
 | `/concepts/[slug]` | Public | Rendered concept page with wikilinks |
 | `/ideas/[slug]` | Public | Rendered idea page with source context |
 | `/review` | Private | Review queue dashboard |
-| `/review/card` | Private | Card-based Kindle-friendly review |
+| `/review/card` | Private | Card-based, Kindle-friendly review |
 
-## Setup (for forking)
+## Key design decisions
 
-### 1. Clone and install
+- **AI extracts, human reviews.** Every idea starts `unreviewed`. The human is the bottleneck on purpose — internalization requires friction.
+- **Atomic ideas, not summaries.** Each idea file is one insight, not a book summary. That's what makes cross-source synthesis possible.
+- **Concepts are hub nodes, not content pages.** Backlinks do the heavy lifting; concept pages stay under 20 lines.
+- **Sources are immutable.** Raw notes are never modified after capture. Interpretation lives in the extracted layer.
+- **Spaced repetition for retention.** Reviewed ideas resurface on a schedule so knowledge compounds instead of fading.
 
-```bash
-git clone https://github.com/h3qing/building-a-second-brain.git
-cd building-a-second-brain
-npm install
-```
+## Contributing
 
-### 2. Configure environment
+Issues and PRs welcome — especially new source adapters (Readwise, Pocket, RSS), additional review UIs, and deployment guides for other hosts. See the [`good first issue`](https://github.com/h3qing/building-a-second-brain/labels/good%20first%20issue) label to get started.
 
-```bash
-cp .env.example .env.local
-```
+## Inspired by
 
-```bash
-GITHUB_TOKEN=ghp_...              # needs repo scope for private vaults
-GITHUB_REPO_OWNER=your-username
-GITHUB_REPO_NAME=your-vault-repo
-AUTH_PIN_HASH=$2b$10$...           # node -e "require('bcryptjs').hash('your-pin', 10).then(console.log)"
-REVALIDATE_SECRET=your-secret
-```
-
-### 3. Run
-
-```bash
-npm run dev
-```
-
-### 4. Deploy
-
-Push to GitHub, connect to Vercel, add env vars, done.
-
-## Vault Schema
-
-The app expects an Obsidian vault following the [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f):
-
-```
-00 Meta/           Schema, log, index, review queue
-10 Notes/          Raw sources (immutable)
-20 Ideas/          Atomic ideas (AI-generated, human-reviewed)
-30 Concept/        Cross-source synthesis (lean hub nodes)
-40 Write/          Human writing and publishing
-```
-
-Ideas have frontmatter with `review_status: unreviewed | reviewed | contested` and spaced repetition fields (`review_count`, `review_interval`, `next_review_date`, `difficulty`).
-
-## Inspired By
-
-- [Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) for the vault pattern
-- [Zettelkasten method](https://zettelkasten.de/introduction/) for atomic notes and cross-linking
-- [Leitner system](https://en.wikipedia.org/wiki/Leitner_system) for spaced repetition
-- [Obsidian](https://obsidian.md) for local-first knowledge management
-- [Claude Code](https://claude.ai/claude-code) for AI-assisted extraction and synthesis
+- [Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) — the vault pattern
+- [Zettelkasten](https://zettelkasten.de/introduction/) — atomic notes and cross-linking
+- [Leitner system](https://en.wikipedia.org/wiki/Leitner_system) — spaced repetition
+- [Obsidian](https://obsidian.md) — local-first knowledge management
+- [Claude Code](https://claude.ai/claude-code) — AI-assisted extraction and synthesis
 
 ## License
 
-MIT
+MIT — see [LICENSE](./LICENSE). Build your own, make it yours.
