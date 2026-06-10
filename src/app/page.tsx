@@ -32,6 +32,12 @@ export default async function Home() {
           >
             review queue
           </Link>
+          <Link
+            href="/tensions"
+            className="text-muted hover:text-foreground transition-colors"
+          >
+            tensions
+          </Link>
           <a
             href="https://heqinghuang.com"
             className="text-muted hover:text-foreground transition-colors"
