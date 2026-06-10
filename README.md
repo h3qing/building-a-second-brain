@@ -34,6 +34,7 @@ This is a system. It's not a read-later app and not a note-taking app — it's a
 - **Nothing counts until you review it.** Every AI-generated idea starts `unreviewed`. Friction is the feature — internalization requires it.
 - **Knowledge connects across sources.** A concept like *negotiation* pulls from 7 different books and podcasts. The graph gets denser with everything you consume.
 - **It's yours and it's free.** Self-hosted, MIT-licensed, your data in your own private repo. Think *Obsidian Publish + an AI research assistant + Anki*, without the subscriptions.
+- **Output, not just storage.** Most knowledge tools hoard. This one pushes toward writing: [`/write`](#tools-for-turning-knowledge-into-output) tells you which concepts you've read enough to write about and hands you a draft brief, [`/tensions`](#tools-for-turning-knowledge-into-output) surfaces where your sources disagree so you can take a side, and review hides the answer so you actually recall it instead of re-reading.
 
 ## How it works
 
@@ -131,27 +132,41 @@ Books / Articles / Podcasts
 | `/concepts/[slug]` | Public | Rendered concept page with wikilinks |
 | `/ideas/[slug]` | Public | Rendered idea page with source context |
 | `/review` | Private | Review queue dashboard |
-| `/review/card` | Private | Card-based, Kindle-friendly review |
+| `/review/card` | Private | Card-based review with **active recall** (insight hidden until you reveal it) |
+| `/write` | Public | Concepts you've reviewed enough to write about |
+| `/write/[slug]` | Public | A writing brief: definition, tension, prompt, and source material |
+| `/tensions` | Public | Where your sources disagree, framed as "pick a side" |
 
-## Recall API
+## Tools for turning knowledge into output
 
-Recall is the point — so the spaced-repetition data is exposed as a small read-only JSON API you can plug into any workflow (a morning email, a Slack bot, a terminal card, an LLM that quizzes you). Set `RECAP_TOKEN` and pass it as a bearer token (or `?token=`).
+Collecting is the easy half. These close the loop to thinking and writing:
+
+- **Writing briefs (`/write`).** A concept becomes "ready to write" once enough reviewed ideas link to it. Open one and you get the definition, the cross-source tension, a synthesized prompt, and every linked idea (insight + quote), assembled to draft from. Copy as markdown or pull it via API.
+- **Active recall (`/review/card`).** Re-reviews hide the insight behind a Reveal button, so you recall it before checking yourself, then rate how well you did (which sets the next spaced-repetition interval). Real recall, not passive re-reading.
+- **Tensions (`/tensions`).** A feed of concepts whose sources disagree. Taking a side is how reading turns into writing.
+
+## API
+
+Everything above is also a read-only JSON API, so recall and writing plug into your own workflows (a morning email, a Slack bot, a terminal card, an LLM that quizzes you). Set `RECAP_TOKEN` and pass it as `Authorization: Bearer <token>` (preferred; `?token=` works but can leak via logs).
 
 | Endpoint | Returns |
 |----------|---------|
-| `GET /api/recap/today` | Items **due** for review today + a couple of random reviewed concepts to rediscover |
+| `GET /api/recap/today` | Items **due** for review today + a couple of reviewed items to rediscover |
 | `GET /api/recap/random?n=3&type=concept\|idea` | N random reviewed items |
+| `GET /api/recap/tensions?n=3` | Concepts where your sources disagree |
+| `GET /api/write/brief?concept=<slug>` | A full writing brief for one concept |
 
-Both accept `?format=json` (default), `text`, or `md`. Unset `RECAP_TOKEN` → the endpoints `503` (never serve review data open by default).
+All accept `?format=json` (default), `text`, or `md`. Unset `RECAP_TOKEN` → the endpoints `503` (never serve data open by default).
 
 ```bash
 # today's recall as a plain-text digest (drop into a cron → email/Slack)
 curl -H "Authorization: Bearer $RECAP_TOKEN" \
   "https://your-app.vercel.app/api/recap/today?format=text"
 
-# pipe 3 random ideas into Claude to generate active-recall questions
-curl -s "https://your-app.vercel.app/api/recap/random?n=3&type=idea&token=$RECAP_TOKEN" \
-  | claude -p "Quiz me on these — one question each, don't show the answers yet."
+# turn a concept's brief into a first draft
+curl -s -H "Authorization: Bearer $RECAP_TOKEN" \
+  "https://your-app.vercel.app/api/write/brief?concept=clarity&format=md" \
+  | claude -p "Draft this essay in my voice. Take a position; don't summarize."
 ```
 
 ## Key design decisions
