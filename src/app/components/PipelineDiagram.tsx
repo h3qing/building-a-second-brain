@@ -156,7 +156,7 @@ export default function PipelineDiagram() {
       {/* Layer 4: This App */}
       <div style={accentBox}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <div style={{ ...title, color: "var(--ink-accent)" }}>secondbrain.heqinghuang.com</div>
+          <div style={{ ...title, color: "var(--ink-accent)" }}>second-brain.heqinghuang.com</div>
         </div>
         <div style={desc}>
           AI extracts. Human reviews. Only approved content goes public.
