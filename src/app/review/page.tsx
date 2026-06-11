@@ -6,6 +6,7 @@ import {
   cardHref,
   type QueueItem,
 } from "@/lib/review-queue";
+import { spanLabel, daysBetween, timeUntil } from "@/lib/time";
 import { ReviewStats } from "@/app/components/ReviewStats";
 
 interface SourceGroup {
@@ -14,7 +15,9 @@ interface SourceGroup {
   items: QueueItem[];
 }
 
-function groupBySource(items: QueueItem[]): SourceGroup[] {
+// `byWait` orders groups by their longest-waiting item (items are already
+// time-sorted by categorize), so the most neglected source floats up.
+function groupBySource(items: QueueItem[], byWait = false): SourceGroup[] {
   const groups = new Map<string, SourceGroup>();
 
   for (const item of items) {
@@ -31,6 +34,8 @@ function groupBySource(items: QueueItem[]): SourceGroup[] {
     }
     groups.get(key)!.items.push(item);
   }
+
+  if (byWait) return [...groups.values()];
 
   return [...groups.values()].sort((a, b) => {
     if (a.type === "concept") return 1;
@@ -58,14 +63,18 @@ const SOURCE_ICONS: Record<string, string> = {
 
 function CardSection({
   title,
+  subtitle,
   groups,
   mode,
   tone,
+  meta,
 }: {
   title: string;
+  subtitle?: string;
   groups: SourceGroup[];
   mode?: string;
   tone?: "accent" | "danger" | "muted";
+  meta?: (item: QueueItem) => string | null;
 }) {
   const totalCount = groups.reduce((sum, g) => sum + g.items.length, 0);
   const toneStyle =
@@ -77,9 +86,14 @@ function CardSection({
 
   return (
     <section>
-      <h2 className="label mb-4" style={toneStyle}>
+      <h2 className={subtitle ? "label mb-1" : "label mb-4"} style={toneStyle}>
         {title} ({totalCount})
       </h2>
+      {subtitle && (
+        <p className="text-sm text-muted mb-4" style={{ fontStyle: "italic" }}>
+          {subtitle}
+        </p>
+      )}
       <div className="rq-breakout">
         <div className="rq-inner">
           {groups.map((group) => (
@@ -90,15 +104,21 @@ function CardSection({
                 <span className="rq-source-count">{group.items.length}</span>
               </div>
               <div className="rq-card-grid">
-                {group.items.map((item) => (
-                  <Link
-                    key={item.path}
-                    href={cardHref(item.path, mode)}
-                    className={`rq-card rq-card-${group.type}`}
-                  >
-                    <span className="rq-card-title">{item.title}</span>
-                  </Link>
-                ))}
+                {group.items.map((item) => {
+                  const metaText = meta ? meta(item) : null;
+                  return (
+                    <Link
+                      key={item.path}
+                      href={cardHref(item.path, mode)}
+                      className={`rq-card rq-card-${group.type}`}
+                    >
+                      <span className="rq-card-title">{item.title}</span>
+                      {metaText && (
+                        <span className="rq-card-meta">{metaText}</span>
+                      )}
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -112,10 +132,21 @@ export default async function ReviewQueue() {
   const isLoggedIn = await verifySession();
 
   const today = new Date().toISOString().split("T")[0];
+  const allItems = await getReviewQueue(true);
   const { unreviewed, contested, reviewed, dueForReview } = categorize(
-    await getReviewQueue(true),
+    allItems,
     today
   );
+
+  // "it's been 3 weeks" — how long an idea has waited since its last visit
+  const sinceReview = (item: QueueItem) =>
+    item.reviewedDate
+      ? `it's been ${spanLabel(daysBetween(item.reviewedDate, today))}`
+      : null;
+
+  // "back in 2 weeks" — when a reviewed idea returns to the queue
+  const backWhen = (item: QueueItem) =>
+    item.nextReviewDate ? `back ${timeUntil(item.nextReviewDate, today)}` : null;
 
   const startHref = isLoggedIn
     ? unreviewed.length > 0
@@ -171,9 +202,11 @@ export default async function ReviewQueue() {
       {dueForReview.length > 0 && (
         <CardSection
           title="Review Again"
-          groups={groupBySource(dueForReview)}
+          subtitle="Longest-waiting ideas first — give them some love."
+          groups={groupBySource(dueForReview, true)}
           mode="rereview"
           tone="accent"
+          meta={sinceReview}
         />
       )}
 
@@ -190,16 +223,30 @@ export default async function ReviewQueue() {
           title="Reviewed"
           groups={groupBySource(reviewed)}
           tone="muted"
+          meta={backWhen}
         />
       )}
 
-      {unreviewed.length === 0 && contested.length === 0 && (
+      {allItems.length === 0 ? (
+        // The vault always has notes once it's seeded — an empty fetch usually
+        // means GitHub rate-limited us mid-session, not an empty queue.
         <div className="text-center py-16 text-muted">
-          <p className="text-lg mb-2">All caught up.</p>
+          <p className="text-lg mb-2">Couldn&apos;t load the queue.</p>
           <p className="text-sm">
-            Nothing to review. Ingest more sources in Claude Code.
+            GitHub may be catching its breath (rate limit). Your reviews are
+            saved — refresh in a minute.
           </p>
         </div>
+      ) : (
+        unreviewed.length === 0 &&
+        contested.length === 0 && (
+          <div className="text-center py-16 text-muted">
+            <p className="text-lg mb-2">All caught up.</p>
+            <p className="text-sm">
+              Nothing to review. Ingest more sources in Claude Code.
+            </p>
+          </div>
+        )
       )}
     </div>
   );

@@ -9,6 +9,7 @@ import {
   replaceInsight,
   type Difficulty,
 } from "@/lib/parser";
+import { applyReviewToQueueCache } from "@/lib/review-queue";
 
 export async function reviewAction(formData: FormData) {
   const isLoggedIn = await verifySession();
@@ -87,6 +88,10 @@ export async function reviewAction(formData: FormData) {
         );
     await updateFile(path, freshContent, file!.sha, message);
   }
+
+  // Keep the in-memory queue cache in step with the commit so the next card
+  // render reflects this review immediately (status, dates, session position).
+  applyReviewToQueueCache(path, action, today);
 
   redirect(returnTo || "/review");
 }

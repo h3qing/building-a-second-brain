@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 import { verifySession } from "@/lib/auth";
 import { getFileContent } from "@/lib/github";
 import { parseReviewItem } from "@/lib/parser";
 import { getReviewQueue, queueForCard, cardHref } from "@/lib/review-queue";
 import { ReviewCardForm } from "./insight-editor";
+import { IdeaJourney } from "./journey";
 
 export default async function CardReview({
   searchParams,
@@ -15,6 +17,7 @@ export default async function CardReview({
     prev?: string;
     pos?: string;
     mode?: string;
+    done?: string;
   }>;
 }) {
   const isLoggedIn = await verifySession();
@@ -48,9 +51,16 @@ export default async function CardReview({
   const prevPath = idx > 0 ? queue[idx - 1].path : null;
   const nextPath =
     idx >= 0 && idx < queue.length - 1 ? queue[idx + 1].path : null;
-  const position = idx >= 0 ? `${idx + 1} of ${queue.length}` : "";
 
-  const nextForAction = nextPath ? cardHref(nextPath, navMode) : "/review";
+  // Reviewed cards drop out of the recomputed queue, so the raw index resets
+  // to 1 after every review. `done` counts this session's completed cards and
+  // keeps both the position and the total steady.
+  const done = Math.max(0, parseInt(params.done ?? "0", 10) || 0);
+  const position = idx >= 0 ? `${done + idx + 1} of ${done + queue.length}` : "";
+
+  // Reviewing removes this card from the queue: the next card shifts to the
+  // front, so completing one increments `done` while navigation keeps it.
+  const nextForAction = nextPath ? cardHref(nextPath, navMode, done + 1) : "/review";
 
   const pathParts = currentPath.split("/");
   const folder =
@@ -96,6 +106,11 @@ export default async function CardReview({
           {item.title}
         </h1>
       </header>
+
+      {/* Journey timeline — the idea's life story, loads in after the card */}
+      <Suspense fallback={null}>
+        <IdeaJourney path={currentPath} frontmatter={item.frontmatter} />
+      </Suspense>
 
       {/* Original Highlights */}
       {item.sourceHighlights.length > 0 && (
@@ -194,7 +209,7 @@ export default async function CardReview({
       {nextPath && (
         <div className="text-center">
           <Link
-            href={cardHref(nextPath, navMode)}
+            href={cardHref(nextPath, navMode, done)}
             className="text-sm text-muted hover:text-foreground transition-colors"
           >
             Skip for now &rarr;
@@ -207,14 +222,14 @@ export default async function CardReview({
         className="flex items-center justify-between pt-5 border-t border-border"
       >
         {prevPath ? (
-          <Link href={cardHref(prevPath, navMode)} className="btn btn-nav">
+          <Link href={cardHref(prevPath, navMode, done)} className="btn btn-nav">
             &larr; Prev
           </Link>
         ) : (
           <span />
         )}
         {nextPath ? (
-          <Link href={cardHref(nextPath, navMode)} className="btn btn-nav">
+          <Link href={cardHref(nextPath, navMode, done)} className="btn btn-nav">
             Next &rarr;
           </Link>
         ) : (

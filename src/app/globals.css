@@ -424,6 +424,55 @@ a {
   font-family: var(--font-mono);
 }
 
+/* Relative-time chip on queue cards: "it's been 3 weeks" / "back in 5 days" */
+.rq-card-meta {
+  font-size: 0.68rem;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  margin-top: auto;
+}
+
+/* Idea journey — the card's life story as a small timeline */
+.journey {
+  border-left: 2px solid var(--ink-border);
+  padding: 0.25rem 0 0.25rem 1rem;
+}
+
+.journey-headline {
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--ink-accent);
+}
+
+.journey-headline + .journey-rows {
+  margin-top: 0.625rem;
+}
+
+.journey-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.journey-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  color: var(--ink-muted);
+}
+
+.journey-icon {
+  flex-shrink: 0;
+}
+
+@media (monochrome) {
+  .journey-headline {
+    color: var(--ink-text);
+  }
+}
+
 @media (monochrome) {
   .rq-breakout {
     width: auto;
