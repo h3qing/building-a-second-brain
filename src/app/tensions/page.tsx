@@ -59,6 +59,32 @@ export default async function TensionsPage() {
                 </Link>
               </div>
               <p className="read">{t.text}</p>
+              {t.sources.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {t.sources.map((s) => {
+                    const icon = s.type === "podcast" ? "🎙" : "📖";
+                    const className =
+                      "inline-flex items-center gap-1.5 text-xs px-2.5 py-1 border border-border rounded-sm text-muted font-mono";
+                    return s.url ? (
+                      <a
+                        key={s.name}
+                        href={s.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`${className} hover:text-foreground hover:border-foreground transition-colors`}
+                      >
+                        <span>{icon}</span>
+                        <span>{s.name}</span>
+                      </a>
+                    ) : (
+                      <span key={s.name} className={className}>
+                        <span>{icon}</span>
+                        <span>{s.name}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
             </article>
           ))}
         </div>
