@@ -30,7 +30,8 @@ function encodePath(path: string): string {
 // --- Git Trees API (1 call = all files) ---
 
 let treeCache: { entries: TreeEntry[]; fetchedAt: number } | null = null;
-const TREE_CACHE_TTL = 30_000; // 30s in-memory cache
+const TREE_CACHE_TTL = 30_000; // 30s in-memory cache (within a warm lambda)
+const TREE_REVALIDATE = 900; // 15min Next data cache (cross-request, enables ISR)
 
 export async function getRepoTree(): Promise<TreeEntry[]> {
   const now = Date.now();
@@ -39,7 +40,13 @@ export async function getRepoTree(): Promise<TreeEntry[]> {
   }
 
   const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/git/trees/${BRANCH}?recursive=1`;
-  const res = await fetch(url, { headers: headers(), cache: "no-store" });
+  // Cache at the Next data layer so pages that list files stay statically
+  // renderable (ISR). A hardcoded "no-store" here forces every consuming route
+  // to render dynamically, defeating page-level `revalidate`.
+  const res = await fetch(url, {
+    headers: headers(),
+    next: { revalidate: TREE_REVALIDATE },
+  });
   if (!res.ok) return treeCache?.entries || [];
 
   const data = await res.json();
