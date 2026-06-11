@@ -156,7 +156,13 @@ export function queueForCard(
   today: string
 ): QueueItem[] {
   const cat = categorize(items, today);
-  if (mode === "rereview") return cat.dueForReview;
+  // Re-review mode pins the due queue only when the card is actually due.
+  // A reviewed-but-not-due card also runs in re-review mode (recall) but lives
+  // in the `reviewed` section — fall through so its prev/next resolve there
+  // instead of collapsing to a lone card.
+  if (mode === "rereview" && cat.dueForReview.some((i) => i.path === currentPath)) {
+    return cat.dueForReview;
+  }
 
   for (const section of [cat.unreviewed, cat.contested, cat.dueForReview, cat.reviewed]) {
     if (section.some((i) => i.path === currentPath)) return section;
