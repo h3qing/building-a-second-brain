@@ -1,5 +1,6 @@
 import { listFiles, getFilesContent } from "./github";
-import { parseFrontmatter, extractTitle } from "./parser";
+import { parseFrontmatter, extractTitle, computeNextInterval, type Difficulty } from "./parser";
+import { toISODate } from "./time";
 
 export interface QueueItem {
   path: string;
@@ -9,6 +10,8 @@ export interface QueueItem {
   folder: string;
   nextReviewDate?: string;
   reviewCount?: number;
+  reviewedDate?: string;
+  reviewInterval?: number;
 }
 
 export interface CategorizedQueue {
@@ -35,6 +38,11 @@ export async function getReviewQueue(forceFresh = false): Promise<QueueItem[]> {
     listFiles("30 Concept"),
   ]);
   const allPaths = [...ideaPaths, ...conceptPaths];
+
+  // An empty tree mid-session means GitHub errored (rate limit), not that the
+  // vault is empty — serve the last known queue rather than zeroing out.
+  if (allPaths.length === 0 && cache) return cache.items;
+
   const files = await getFilesContent(allPaths);
 
   const items: QueueItem[] = [];
@@ -57,25 +65,85 @@ export async function getReviewQueue(forceFresh = false): Promise<QueueItem[]> {
       source,
       status: frontmatter.review_status as string,
       folder,
-      nextReviewDate: frontmatter.next_review_date as string | undefined,
+      nextReviewDate: toISODate(frontmatter.next_review_date),
       reviewCount: frontmatter.review_count as number | undefined,
+      reviewedDate: toISODate(frontmatter.reviewed_date),
+      reviewInterval: frontmatter.review_interval as number | undefined,
     });
   }
+
+  // Same guard for content fetches: don't clobber a good cache with a batch
+  // of failed reads.
+  if (items.length === 0 && cache && cache.items.length > 0) return cache.items;
 
   cache = { items, at: now };
   return items;
 }
 
+// Missing dates sort last so undated items don't jump the queue.
+function byOldestReview(a: QueueItem, b: QueueItem): number {
+  if (!a.reviewedDate) return b.reviewedDate ? 1 : 0;
+  if (!b.reviewedDate) return -1;
+  return a.reviewedDate.localeCompare(b.reviewedDate);
+}
+
 export function categorize(items: QueueItem[], today: string): CategorizedQueue {
-  const reviewed = items.filter((i) => i.status === "reviewed");
+  // Reviewed items surface by next due date; due items by how long it's been
+  // since the last visit, so the longest-waiting ideas come up first.
+  const reviewed = items
+    .filter((i) => i.status === "reviewed")
+    .sort((a, b) => (a.nextReviewDate || "").localeCompare(b.nextReviewDate || ""));
   return {
     unreviewed: items.filter((i) => i.status === "unreviewed"),
     contested: items.filter((i) => i.status === "contested"),
     reviewed,
-    dueForReview: reviewed.filter(
-      (i) => i.nextReviewDate && i.nextReviewDate <= today
-    ),
+    dueForReview: reviewed
+      .filter((i) => i.nextReviewDate && i.nextReviewDate <= today)
+      .sort(byOldestReview),
   };
+}
+
+// Patch the cached queue after a review commit so the very next card render
+// (within the TTL) sees the new status. Without this the just-reviewed item
+// re-appears in its old section and the session position resets to 1.
+export function applyReviewToQueueCache(
+  path: string,
+  action: string,
+  today: string
+): void {
+  const item = cache?.items.find((i) => i.path === path);
+  if (!item || !cache) return;
+
+  if (action === "contest") {
+    item.status = "contested";
+  } else if (action === "approve") {
+    item.status = "reviewed";
+    item.reviewedDate = today;
+    if (!item.reviewCount) {
+      item.reviewCount = 1;
+      item.reviewInterval = 1;
+      item.nextReviewDate = addDaysISO(today, 1);
+    }
+  } else if (action === "easy" || action === "medium" || action === "hard") {
+    const nextInterval = computeNextInterval(
+      item.reviewInterval || 1,
+      action as Difficulty
+    );
+    item.status = "reviewed";
+    item.reviewedDate = today;
+    item.reviewCount = (item.reviewCount || 1) + 1;
+    item.reviewInterval = nextInterval;
+    item.nextReviewDate = addDaysISO(today, nextInterval);
+  }
+  // Refresh the TTL: the patched cache is now more accurate than an immediate
+  // refetch (GitHub reads can lag the write by a moment).
+  cache.at = Date.now();
+}
+
+function addDaysISO(iso: string, days: number): string {
+  return new Date(Date.parse(iso + "T00:00:00Z") + days * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
 }
 
 // The ordered list a card belongs to, used to find its prev/next during review.
@@ -97,8 +165,11 @@ export function queueForCard(
 }
 
 // Card URL — just the path (+ mode); the queue is recomputed server-side.
-export function cardHref(path: string, mode?: string): string {
+// `done` counts cards completed this session so the "x of y" position keeps
+// advancing even though reviewed cards drop out of the recomputed queue.
+export function cardHref(path: string, mode?: string, done?: number): string {
   const params = new URLSearchParams({ path });
   if (mode) params.set("mode", mode);
+  if (done && done > 0) params.set("done", String(done));
   return `/review/card?${params.toString()}`;
 }
