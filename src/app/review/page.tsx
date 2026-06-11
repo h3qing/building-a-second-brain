@@ -1,77 +1,17 @@
 import Link from "next/link";
 import { verifySession } from "@/lib/auth";
-import { listFiles, getFilesContent } from "@/lib/github";
-import { parseFrontmatter, extractTitle } from "@/lib/parser";
+import {
+  getReviewQueue,
+  categorize,
+  cardHref,
+  type QueueItem,
+} from "@/lib/review-queue";
 import { ReviewStats } from "@/app/components/ReviewStats";
-
-interface QueueItem {
-  path: string;
-  title: string;
-  source: string;
-  status: string;
-  folder: string;
-  nextReviewDate?: string;
-  reviewCount?: number;
-}
 
 interface SourceGroup {
   source: string;
   type: "book" | "podcast" | "concept";
   items: QueueItem[];
-}
-
-async function getReviewItems(): Promise<{
-  unreviewed: QueueItem[];
-  contested: QueueItem[];
-  reviewed: QueueItem[];
-  dueForReview: QueueItem[];
-}> {
-  const [ideaPaths, conceptPaths] = await Promise.all([
-    listFiles("20 Ideas"),
-    listFiles("30 Concept"),
-  ]);
-  const allPaths = [...ideaPaths, ...conceptPaths];
-
-  const files = await getFilesContent(allPaths);
-
-  const items: QueueItem[] = [];
-
-  for (const path of allPaths) {
-    const file = files.get(path);
-    if (!file) continue;
-
-    const { frontmatter, content } = parseFrontmatter(file.content);
-    if (!frontmatter.review_status) continue;
-
-    const folder = path.startsWith("20 Ideas") ? "Ideas" : "Concepts";
-    const source =
-      typeof frontmatter.source === "string"
-        ? frontmatter.source.replace(/\[\[|\]\]/g, "").split("/").pop() || ""
-        : "";
-
-    items.push({
-      path,
-      title: extractTitle(content, path),
-      source,
-      status: frontmatter.review_status as string,
-      folder,
-      nextReviewDate: frontmatter.next_review_date as string | undefined,
-      reviewCount: frontmatter.review_count as number | undefined,
-    });
-  }
-
-  const today = new Date().toISOString().split("T")[0];
-  const reviewed = items.filter((i) => i.status === "reviewed");
-  const dueForReview = reviewed.filter(
-    (i) => i.nextReviewDate && i.nextReviewDate <= today
-  );
-
-  return {
-    unreviewed: items.filter((i) => i.status === "unreviewed"),
-    contested: items.filter((i) => i.status === "contested"),
-    reviewed,
-    dueForReview,
-  };
 }
 
 function groupBySource(items: QueueItem[]): SourceGroup[] {
@@ -101,22 +41,6 @@ function groupBySource(items: QueueItem[]): SourceGroup[] {
   });
 }
 
-function buildCardUrl(
-  items: QueueItem[],
-  index: number,
-  total: number,
-  mode?: string
-): string {
-  const item = items[index];
-  const params = new URLSearchParams();
-  params.set("path", item.path);
-  if (index > 0) params.set("prev", items[index - 1].path);
-  if (index < items.length - 1) params.set("next", items[index + 1].path);
-  params.set("pos", `${index + 1} of ${total}`);
-  if (mode) params.set("mode", mode);
-  return `/review/card?${params.toString()}`;
-}
-
 function Stat({ count, label }: { count: number; label: string }) {
   return (
     <div className="inline-block" style={{ marginRight: "2rem", marginBottom: "0.5rem" }}>
@@ -135,13 +59,11 @@ const SOURCE_ICONS: Record<string, string> = {
 function CardSection({
   title,
   groups,
-  allItems,
   mode,
   tone,
 }: {
   title: string;
   groups: SourceGroup[];
-  allItems: QueueItem[];
   mode?: string;
   tone?: "accent" | "danger" | "muted";
 }) {
@@ -168,24 +90,15 @@ function CardSection({
                 <span className="rq-source-count">{group.items.length}</span>
               </div>
               <div className="rq-card-grid">
-                {group.items.map((item) => {
-                  const globalIndex = allItems.indexOf(item);
-                  const href = buildCardUrl(
-                    allItems,
-                    globalIndex,
-                    allItems.length,
-                    mode
-                  );
-                  return (
-                    <Link
-                      key={item.path}
-                      href={href}
-                      className={`rq-card rq-card-${group.type}`}
-                    >
-                      <span className="rq-card-title">{item.title}</span>
-                    </Link>
-                  );
-                })}
+                {group.items.map((item) => (
+                  <Link
+                    key={item.path}
+                    href={cardHref(item.path, mode)}
+                    className={`rq-card rq-card-${group.type}`}
+                  >
+                    <span className="rq-card-title">{item.title}</span>
+                  </Link>
+                ))}
               </div>
             </div>
           ))}
@@ -198,12 +111,15 @@ function CardSection({
 export default async function ReviewQueue() {
   const isLoggedIn = await verifySession();
 
-  const { unreviewed, contested, reviewed, dueForReview } =
-    await getReviewItems();
+  const today = new Date().toISOString().split("T")[0];
+  const { unreviewed, contested, reviewed, dueForReview } = categorize(
+    await getReviewQueue(true),
+    today
+  );
 
   const startHref = isLoggedIn
     ? unreviewed.length > 0
-      ? buildCardUrl(unreviewed, 0, unreviewed.length)
+      ? cardHref(unreviewed[0].path)
       : null
     : "/login";
   const startCta = isLoggedIn ? "Start Reviewing" : "Sign in to review";
@@ -248,7 +164,6 @@ export default async function ReviewQueue() {
         <CardSection
           title="Needs Review"
           groups={groupBySource(unreviewed)}
-          allItems={unreviewed}
           tone="accent"
         />
       )}
@@ -257,7 +172,6 @@ export default async function ReviewQueue() {
         <CardSection
           title="Review Again"
           groups={groupBySource(dueForReview)}
-          allItems={dueForReview}
           mode="rereview"
           tone="accent"
         />
@@ -267,7 +181,6 @@ export default async function ReviewQueue() {
         <CardSection
           title="Contested"
           groups={groupBySource(contested)}
-          allItems={contested}
           tone="danger"
         />
       )}
@@ -276,7 +189,6 @@ export default async function ReviewQueue() {
         <CardSection
           title="Reviewed"
           groups={groupBySource(reviewed)}
-          allItems={reviewed}
           tone="muted"
         />
       )}

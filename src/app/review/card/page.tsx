@@ -3,6 +3,7 @@ import Link from "next/link";
 import { verifySession } from "@/lib/auth";
 import { getFileContent } from "@/lib/github";
 import { parseReviewItem } from "@/lib/parser";
+import { getReviewQueue, queueForCard, cardHref } from "@/lib/review-queue";
 import { ReviewCardForm } from "./insight-editor";
 
 export default async function CardReview({
@@ -28,10 +29,6 @@ export default async function CardReview({
 
   const item = await parseReviewItem(currentPath, file.sha, file.content);
 
-  const nextPath = params.next || null;
-  const prevPath = params.prev || null;
-  const position = params.pos || "";
-
   const isReReview =
     params.mode === "rereview" ||
     (typeof item.frontmatter.review_count === "number" &&
@@ -41,9 +38,19 @@ export default async function CardReview({
   // Active recall: re-reviews test recall by default; ?mode=recall forces it.
   const recallMode = params.mode === "recall" || isReReview;
 
-  const nextForAction = nextPath
-    ? `/review/card?path=${encodeURIComponent(nextPath)}${isReReview ? "&mode=rereview" : ""}`
-    : "/review";
+  // Recompute the queue server-side to find this card's neighbours, so the
+  // session flows through the whole queue instead of bouncing back to /review
+  // after one card (the URL no longer carries the next/prev hops).
+  const today = new Date().toISOString().split("T")[0];
+  const navMode = isReReview ? "rereview" : params.mode;
+  const queue = queueForCard(await getReviewQueue(), currentPath, navMode, today);
+  const idx = queue.findIndex((i) => i.path === currentPath);
+  const prevPath = idx > 0 ? queue[idx - 1].path : null;
+  const nextPath =
+    idx >= 0 && idx < queue.length - 1 ? queue[idx + 1].path : null;
+  const position = idx >= 0 ? `${idx + 1} of ${queue.length}` : "";
+
+  const nextForAction = nextPath ? cardHref(nextPath, navMode) : "/review";
 
   const pathParts = currentPath.split("/");
   const folder =
@@ -187,7 +194,7 @@ export default async function CardReview({
       {nextPath && (
         <div className="text-center">
           <Link
-            href={`/review/card?path=${encodeURIComponent(nextPath)}`}
+            href={cardHref(nextPath, navMode)}
             className="text-sm text-muted hover:text-foreground transition-colors"
           >
             Skip for now &rarr;
@@ -200,20 +207,14 @@ export default async function CardReview({
         className="flex items-center justify-between pt-5 border-t border-border"
       >
         {prevPath ? (
-          <Link
-            href={`/review/card?path=${encodeURIComponent(prevPath)}`}
-            className="btn btn-nav"
-          >
+          <Link href={cardHref(prevPath, navMode)} className="btn btn-nav">
             &larr; Prev
           </Link>
         ) : (
           <span />
         )}
         {nextPath ? (
-          <Link
-            href={`/review/card?path=${encodeURIComponent(nextPath)}`}
-            className="btn btn-nav"
-          >
+          <Link href={cardHref(nextPath, navMode)} className="btn btn-nav">
             Next &rarr;
           </Link>
         ) : (
