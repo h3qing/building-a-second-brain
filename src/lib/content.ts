@@ -67,12 +67,19 @@ function resolveWikilinks(
   );
 }
 
+// Drop the note's leading "# Title" — the page renders the title separately,
+// so keeping it in the body shows the title twice. Only the first top-level
+// heading is removed; "## " section headings are untouched.
+function stripLeadingH1(content: string): string {
+  return content.replace(/^\s*#\s+.*(?:\n|$)/, "");
+}
+
 // Render markdown to HTML with wikilink resolution
 export async function renderMarkdown(
   content: string,
   fileIndex: Map<string, FileEntry>
 ): Promise<string> {
-  const withLinks = resolveWikilinks(content, fileIndex);
+  const withLinks = resolveWikilinks(stripLeadingH1(content), fileIndex);
   const result = await remark().use(remarkGfm).use(remarkHtml, { sanitize: false }).process(withLinks);
   return result.toString();
 }
@@ -132,7 +139,8 @@ export async function findIdeaBySlug(slug: string): Promise<{
   return null;
 }
 
-// Parse log.md into pipeline feed entries
+// Parse log.md into pipeline feed entries. Each entry is a section header of the
+// form "## [YYYY-MM-DD] <action> | <title>", newest first.
 export async function parsePipelineFeed(): Promise<
   Array<{
     date: string;
@@ -143,25 +151,27 @@ export async function parsePipelineFeed(): Promise<
   const file = await getFileContent("00 Meta/log.md", "force-cache");
   if (!file) return [];
 
-  const lines = file.content.split("\n").filter((l) => l.startsWith("- "));
   const entries: Array<{ date: string; text: string; tags: string[] }> = [];
-
-  for (const line of lines) {
-    const dateMatch = line.match(/^-\s*\*?\*?(\d{4}-\d{2}-\d{2})\*?\*?\s*/);
-    if (!dateMatch) continue;
-
-    const date = dateMatch[1];
-    const text = line.slice(dateMatch[0].length).replace(/^\s*[-—]\s*/, "");
+  const headerRe = /^##\s*\[(\d{4}-\d{2}-\d{2})\]\s*(.+?)\s*$/gm;
+  let match;
+  while ((match = headerRe.exec(file.content)) !== null) {
+    const date = match[1];
+    const heading = match[2];
+    const lower = heading.toLowerCase();
 
     const tags: string[] = [];
-    if (text.toLowerCase().includes("extract")) tags.push("extracted");
-    if (text.toLowerCase().includes("synth")) tags.push("synthesized");
-    if (text.toLowerCase().includes("review")) tags.push("reviewed");
-    if (text.toLowerCase().includes("ingest")) tags.push("ingested");
-    if (text.toLowerCase().includes("concept")) tags.push("new concept");
+    if (lower.includes("ingest")) tags.push("ingested");
+    if (lower.includes("extract")) tags.push("extracted");
+    if (lower.includes("synth")) tags.push("synthesized");
+    if (lower.includes("review")) tags.push("reviewed");
+    if (lower.includes("concept")) tags.push("new concept");
+
+    // Drop the leading "<action> | " so the title reads cleanly.
+    const text = heading.replace(/^[\w-]+\s*\|\s*/, "");
 
     entries.push({ date, text, tags });
   }
 
-  return entries.reverse().slice(0, 20);
+  // log.md is newest-first, so the first matches are the most recent.
+  return entries.slice(0, 20);
 }
