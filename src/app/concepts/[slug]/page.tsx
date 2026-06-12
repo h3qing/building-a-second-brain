@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { findConceptBySlug } from "@/lib/content";
+import { formatDate } from "@/lib/time";
 
 export default async function ConceptPage({
   params,
@@ -39,8 +40,8 @@ export default async function ConceptPage({
         {frontmatter.source_count ? (
           <p>{String(frontmatter.source_count)} sources</p>
         ) : null}
-        {frontmatter.last_updated ? (
-          <p>Last updated: {String(frontmatter.last_updated)}</p>
+        {formatDate(frontmatter.last_updated) ? (
+          <p>Last updated: {formatDate(frontmatter.last_updated)}</p>
         ) : null}
       </div>
     </div>
