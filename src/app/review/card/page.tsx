@@ -167,7 +167,7 @@ export default async function CardReview({
                 fontStyle: "italic",
               }}
             >
-              <p>{ctx.quote}</p>
+              {ctx.quote && <p>{ctx.quote}</p>}
               {ctx.timestampLabel && ctx.timestampUrl && (
                 <a
                   href={ctx.timestampUrl}

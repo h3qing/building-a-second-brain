@@ -93,7 +93,9 @@ export function extractSourceContext(content: string): SourceContext[] {
       .trim();
 
     contexts.push({
-      quote: fullQuote || match[0],
+      // Never fall back to the raw markdown link — a bare timestamp with no
+      // surrounding prose renders as just the timestamp link, not "[29:55](url)".
+      quote: fullQuote,
       timestampLabel: match[1],
       timestampUrl: match[2],
     });
