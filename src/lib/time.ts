@@ -17,6 +17,18 @@ export function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Human-readable date for display, e.g. "Jun 1, 2026". Accepts a string or Date.
+export function formatDate(value: unknown): string | undefined {
+  const iso = toISODate(value);
+  if (!iso) return undefined;
+  return new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 export function daysBetween(fromISO: string, toISO: string): number {
   return Math.round(
     (Date.parse(toISO + "T00:00:00Z") - Date.parse(fromISO + "T00:00:00Z")) /
