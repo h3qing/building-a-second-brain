@@ -11,7 +11,9 @@ export interface GraphNode {
   isOrphan: boolean;
   color: string;
   slug: string;
-  type: "concept" | "idea";
+  type: "concept" | "idea" | "writing";
+  // Published essays link out to the blog instead of an internal page.
+  url?: string;
 }
 
 export interface GraphLink {
@@ -38,13 +40,14 @@ function slugify(name: string): string {
 
 export async function buildGraphData(): Promise<GraphData> {
   // List files (uses tree API — 1 call)
-  const [conceptPaths, ideaPaths] = await Promise.all([
+  const [conceptPaths, ideaPaths, writingPaths] = await Promise.all([
     listFiles("30 Concept", "force-cache"),
     listFiles("20 Ideas", "force-cache"),
+    listFiles("40 Write/49 Publish", "force-cache"),
   ]);
 
   // Fetch all content in parallel
-  const allPaths = [...conceptPaths, ...ideaPaths];
+  const allPaths = [...conceptPaths, ...ideaPaths, ...writingPaths];
   const files = await getFilesContent(allPaths, "force-cache");
 
   const nodes: GraphNode[] = [];
@@ -123,6 +126,53 @@ export async function buildGraphData(): Promise<GraphData> {
       color: "",
       slug,
       type: "idea",
+    });
+
+    fileIndex.set(filename.toLowerCase(), id);
+  }
+
+  // Published essays — the output side of the loop. They cite concepts via
+  // wikilinks, so the graph connects writing back to the knowledge it draws on.
+  for (const path of writingPaths) {
+    const file = files.get(path);
+    if (!file) continue;
+
+    const { frontmatter, content } = parseFrontmatter(file.content);
+    // Only the published essays carry a blog url / publish date; skip WIP drafts.
+    const url = typeof frontmatter.url === "string" ? frontmatter.url : undefined;
+    if (!url && !frontmatter.date_published) continue;
+
+    const filename = path.split("/").pop()?.replace(".md", "") || "";
+    const title =
+      typeof frontmatter.title === "string" && frontmatter.title
+        ? frontmatter.title
+        : extractTitle(content, path);
+    const slug = slugify(filename);
+    const id = `writing:${slug}`;
+
+    const tags = Array.isArray(frontmatter.tags) ? frontmatter.tags : [];
+    for (const tag of tags) {
+      tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+    }
+
+    const excerpt = content
+      .replace(/^#.+$/m, "")
+      .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, t, a) => a || t)
+      .trim()
+      .slice(0, 140);
+
+    nodes.push({
+      id,
+      title,
+      tags,
+      excerpt,
+      folder: "Writing",
+      linkCount: 0,
+      isOrphan: true,
+      color: "",
+      slug,
+      type: "writing",
+      url,
     });
 
     fileIndex.set(filename.toLowerCase(), id);

@@ -8,7 +8,9 @@ export default function GraphSection({ data }: { data: GraphData }) {
   const router = useRouter();
 
   const handleNodeClick = (node: GraphNode) => {
-    if (node.type === "concept") {
+    if (node.type === "writing") {
+      if (node.url) window.open(node.url, "_blank", "noopener,noreferrer");
+    } else if (node.type === "concept") {
       router.push(`/concepts/${node.slug}`);
     } else {
       router.push(`/ideas/${node.slug}`);
