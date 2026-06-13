@@ -44,13 +44,42 @@ export function ReviewCardForm({
         <div className="flex items-center justify-between">
           <h2 className="label">Insight</h2>
           {isLoggedIn && revealed && (
-            <button
-              type="button"
-              className="insight-toggle"
-              onClick={() => setMode(mode === "ai" ? "custom" : "ai")}
-            >
-              {mode === "ai" ? "Write your own" : "Use AI insight"}
-            </button>
+            <div className="flex items-center gap-4">
+              {mode === "ai" ? (
+                <>
+                  <button
+                    type="button"
+                    className="insight-toggle"
+                    onClick={() => {
+                      // Seed the editor with the existing insight so it can be
+                      // tweaked instead of rewritten from scratch.
+                      setCustomText(aiInsight);
+                      setMode("custom");
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="insight-toggle"
+                    onClick={() => {
+                      setCustomText("");
+                      setMode("custom");
+                    }}
+                  >
+                    Write your own
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="insight-toggle"
+                  onClick={() => setMode("ai")}
+                >
+                  Use AI insight
+                </button>
+              )}
+            </div>
           )}
         </div>
 
