@@ -22,7 +22,8 @@ interface GraphNode {
   isOrphan: boolean;
   color: string;
   slug: string;
-  type: "concept" | "idea";
+  type: "concept" | "idea" | "writing";
+  url?: string;
   x?: number;
   y?: number;
 }
@@ -55,13 +56,19 @@ const TAG_COLORS: Record<string, string> = {
   default: "#a09080",
 };
 
+const CONCEPT_COLOR = "#8b6914"; // gold — synthesized concepts
+const IDEA_COLOR = "#a09080"; // tan — atomic ideas
+const WRITING_COLOR = "#b5603f"; // clay — published essays (drawn as diamonds)
+
 function getNodeColor(node: GraphNode): string {
+  // Essays get a fixed color so they read as one category regardless of tags.
+  if (node.type === "writing") return WRITING_COLOR;
   if (node.color) return node.color;
   for (const tag of node.tags) {
     const normalized = tag.toLowerCase().replace(/\s+/g, "");
     if (TAG_COLORS[normalized]) return TAG_COLORS[normalized];
   }
-  return node.type === "concept" ? "#8b6914" : TAG_COLORS.default;
+  return node.type === "concept" ? CONCEPT_COLOR : IDEA_COLOR;
 }
 
 interface KnowledgeGraphProps {
@@ -133,9 +140,9 @@ export default function KnowledgeGraph({
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!fgRef.current) return;
-      fgRef.current.d3Force("charge")?.strength(-48).distanceMax(260);
-      fgRef.current.d3Force("link")?.distance(34).strength(0.6);
-      fgRef.current.d3Force("center")?.strength(0.7);
+      fgRef.current.d3Force("charge")?.strength(-82).distanceMax(340);
+      fgRef.current.d3Force("link")?.distance(44).strength(0.55);
+      fgRef.current.d3Force("center")?.strength(0.6);
       fgRef.current.d3ReheatSimulation();
 
       if (filteredData.nodes.length > 0) {
@@ -174,14 +181,23 @@ export default function KnowledgeGraph({
         !!searchQuery &&
         graphNode.title.toLowerCase().includes(searchQuery.toLowerCase());
 
+      const cx = node.x || 0;
+      const cy = node.y || 0;
+      const r = isHovered ? nodeSize + 1.3 : nodeSize;
+      const isWriting = graphNode.type === "writing";
+
       ctx.beginPath();
-      ctx.arc(
-        node.x || 0,
-        node.y || 0,
-        isHovered ? nodeSize + 1.3 : nodeSize,
-        0,
-        2 * Math.PI
-      );
+      if (isWriting) {
+        // Diamonds mark published essays — distinct from concept/idea circles.
+        const d = r * 1.3;
+        ctx.moveTo(cx, cy - d);
+        ctx.lineTo(cx + d, cy);
+        ctx.lineTo(cx, cy + d);
+        ctx.lineTo(cx - d, cy);
+        ctx.closePath();
+      } else {
+        ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+      }
 
       if (isHovered) {
         ctx.fillStyle = "#faf8f5";
@@ -202,7 +218,13 @@ export default function KnowledgeGraph({
       ctx.strokeStyle = isHovered ? color : "rgba(180, 168, 148, 0.3)";
       ctx.stroke();
 
-      const shouldRenderLabel = isHovered || isSearchHit || globalScale > 2.2;
+      // Keep the default view clean: labels on hover/search always, essays on a
+      // gentle zoom-in (they're the highlight), other nodes only when zoomed further.
+      const shouldRenderLabel =
+        isHovered ||
+        isSearchHit ||
+        globalScale > 2.2 ||
+        (isWriting && globalScale > 1.35);
       if (!shouldRenderLabel) return;
 
       const rawLabel =
@@ -294,6 +316,28 @@ export default function KnowledgeGraph({
         {filteredData.nodes.length} nodes · {filteredData.links.length} links
       </div>
 
+      {/* Legend */}
+      <div className="absolute top-12 right-3 z-10 flex items-center gap-3 text-xs text-muted bg-background/90 border border-border rounded-full px-3 py-1 backdrop-blur-sm">
+        <span className="flex items-center gap-1.5">
+          <span
+            style={{ width: 8, height: 8, borderRadius: "50%", background: CONCEPT_COLOR }}
+          />
+          concept
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span
+            style={{ width: 8, height: 8, borderRadius: "50%", background: IDEA_COLOR }}
+          />
+          idea
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span
+            style={{ width: 7, height: 7, background: WRITING_COLOR, transform: "rotate(45deg)" }}
+          />
+          essay
+        </span>
+      </div>
+
       {/* Graph canvas */}
       <div
         ref={containerRef}
@@ -340,6 +384,12 @@ export default function KnowledgeGraph({
       {/* Hover card */}
       {hoveredNode && (
         <div className="absolute bottom-3 left-3 z-10 max-w-[280px] bg-background/95 border border-border rounded-lg p-3 backdrop-blur-sm">
+          <div
+            className="label mb-1"
+            style={{ color: getNodeColor(hoveredNode) }}
+          >
+            {hoveredNode.type === "writing" ? "Essay" : hoveredNode.type}
+          </div>
           <div className="font-heading font-semibold text-sm mb-1">
             {hoveredNode.title}
           </div>
@@ -356,6 +406,11 @@ export default function KnowledgeGraph({
             </div>
           )}
           <p className="text-xs text-muted line-clamp-2">{hoveredNode.excerpt}</p>
+          {hoveredNode.type === "writing" && (
+            <p className="text-xs mt-1.5" style={{ color: WRITING_COLOR }}>
+              Read on the blog ↗
+            </p>
+          )}
         </div>
       )}
     </div>
