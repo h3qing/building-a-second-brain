@@ -12,7 +12,8 @@ export default async function Home() {
     parsePipelineFeed(),
   ]);
 
-  const reviewedCount = graphData.nodes.length;
+  const essaysCount = graphData.nodes.filter((n) => n.type === "writing").length;
+  const reviewedCount = graphData.nodes.length - essaysCount;
   const totalLinks = graphData.stats.totalLinks;
 
   return (
@@ -91,12 +92,29 @@ export default async function Home() {
             </span>
             <span className="text-muted ml-1.5">connections</span>
           </div>
+          {essaysCount > 0 && (
+            <div>
+              <span className="text-2xl font-heading text-accent">
+                {essaysCount}
+              </span>
+              <span className="text-muted ml-1.5">essays</span>
+            </div>
+          )}
           <div>
             <span className="text-2xl font-heading text-accent">
               150+
             </span>
             <span className="text-muted ml-1.5">books</span>
           </div>
+        </div>
+      )}
+
+      {/* Knowledge Graph — the centerpiece: concepts, ideas, and the essays
+          that draw on them, all in one map */}
+      {graphData.nodes.length > 0 && (
+        <div>
+          <p className="label mb-3">Knowledge Graph</p>
+          <GraphSection data={graphData} />
         </div>
       )}
 
@@ -127,27 +145,6 @@ export default async function Home() {
         </div>
       )}
 
-      {/* Knowledge Graph — bottom, grows over time */}
-      {reviewedCount > 0 && (
-        <div>
-          <p className="label mb-3">Knowledge Graph</p>
-          <GraphSection data={graphData} />
-        </div>
-      )}
-
-      {/* Footer */}
-      <footer className="border-t border-border pt-4 pb-8 text-xs text-muted">
-        <p>
-          Built with{" "}
-          <a href="https://claude.ai" className="text-accent hover:underline">Claude Code</a>
-          {" "}+{" "}
-          <a href="https://obsidian.md" className="text-accent hover:underline">Obsidian</a>.
-          Inspired by{" "}
-          <a href="https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f" className="text-accent hover:underline">
-            Karpathy&apos;s LLM Wiki
-          </a>.
-        </p>
-      </footer>
     </div>
   );
 }
