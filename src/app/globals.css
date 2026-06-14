@@ -424,6 +424,28 @@ a {
   font-family: var(--font-mono);
 }
 
+/* Star marker on starred queue cards */
+.rq-card-star {
+  color: var(--ink-accent);
+}
+
+/* Star toggle in the card review header */
+.star-toggle {
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--ink-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+  transition: color 0.15s ease;
+}
+
+.star-toggle:hover,
+.star-toggle.is-starred {
+  color: var(--ink-accent);
+}
+
 /* Relative-time chip on queue cards: "it's been 3 weeks" / "back in 5 days" */
 .rq-card-meta {
   font-size: 0.68rem;

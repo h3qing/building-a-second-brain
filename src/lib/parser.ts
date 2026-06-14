@@ -259,6 +259,15 @@ export function updateReviewStatus(
   return matter.stringify(content, updated);
 }
 
+// Toggle a note's star flag without touching its review status or SR schedule.
+// Starring just marks a note worth coming back to; it lives alongside the
+// review metadata in the same frontmatter.
+export function updateStarStatus(rawContent: string, starred: boolean): string {
+  const { data, content } = matter(rawContent);
+  const updated = { ...data, starred };
+  return matter.stringify(content, updated);
+}
+
 export function updateSpacedRepetition(
   rawContent: string,
   difficulty: Difficulty,

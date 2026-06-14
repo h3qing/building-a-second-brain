@@ -112,7 +112,14 @@ function CardSection({
                       href={cardHref(item.path, mode)}
                       className={`rq-card rq-card-${group.type}`}
                     >
-                      <span className="rq-card-title">{item.title}</span>
+                      <span className="rq-card-title">
+                        {item.starred && (
+                          <span className="rq-card-star" aria-label="Starred">
+                            ★{" "}
+                          </span>
+                        )}
+                        {item.title}
+                      </span>
                       {metaText && (
                         <span className="rq-card-meta">{metaText}</span>
                       )}

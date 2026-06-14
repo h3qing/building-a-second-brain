@@ -12,6 +12,7 @@ export interface QueueItem {
   reviewCount?: number;
   reviewedDate?: string;
   reviewInterval?: number;
+  starred?: boolean;
 }
 
 export interface CategorizedQueue {
@@ -69,6 +70,7 @@ export async function getReviewQueue(forceFresh = false): Promise<QueueItem[]> {
       reviewCount: frontmatter.review_count as number | undefined,
       reviewedDate: toISODate(frontmatter.reviewed_date),
       reviewInterval: frontmatter.review_interval as number | undefined,
+      starred: frontmatter.starred === true,
     });
   }
 
@@ -113,6 +115,14 @@ export function applyReviewToQueueCache(
 ): void {
   const item = cache?.items.find((i) => i.path === path);
   if (!item || !cache) return;
+
+  // Star toggles don't affect status or schedule — just flip the flag and let
+  // the queue keep its current order.
+  if (action === "star" || action === "unstar") {
+    item.starred = action === "star";
+    cache.at = Date.now();
+    return;
+  }
 
   if (action === "contest") {
     item.status = "contested";
