@@ -26,6 +26,55 @@ export interface CategorizedQueue {
 let cache: { items: QueueItem[]; at: number } | null = null;
 const TTL = 15_000;
 
+// Reviews patch the in-memory queue immediately, but the landing page rebuilds
+// from GitHub (forceFresh) and GitHub's contents API can lag a commit by a few
+// seconds. Without a bridge, that stale read resurrects a card the user just
+// reviewed — the "I already reviewed these today" bug. Keep each applied review
+// around long enough to outlast the lag and overlay it on any rebuild whose
+// fetched data hasn't caught up yet.
+interface ReviewPatch {
+  status: string;
+  reviewedDate?: string;
+  reviewCount?: number;
+  reviewInterval?: number;
+  nextReviewDate?: string;
+  isContest: boolean;
+  at: number;
+}
+const recentReviews = new Map<string, ReviewPatch>();
+const PATCH_TTL = 120_000; // 2 min — covers GitHub read-after-write propagation
+
+function overlayRecentReviews(items: QueueItem[]): void {
+  const now = Date.now();
+  for (const [path, patch] of recentReviews) {
+    if (now - patch.at > PATCH_TTL) {
+      recentReviews.delete(path);
+      continue;
+    }
+    const item = items.find((i) => i.path === path);
+    if (!item) continue;
+
+    // Drop the patch once the fetched data reflects (or surpasses) the review,
+    // so a stale-read bridge never clobbers a newer real edit.
+    const caughtUp = patch.isContest
+      ? item.status === patch.status
+      : (item.reviewedDate || "") >= (patch.reviewedDate || "") &&
+        (item.reviewCount || 0) >= (patch.reviewCount || 0);
+    if (caughtUp) {
+      recentReviews.delete(path);
+      continue;
+    }
+
+    item.status = patch.status;
+    if (!patch.isContest) {
+      item.reviewedDate = patch.reviewedDate;
+      item.reviewCount = patch.reviewCount;
+      item.reviewInterval = patch.reviewInterval;
+      item.nextReviewDate = patch.nextReviewDate;
+    }
+  }
+}
+
 // All idea + concept notes that carry a review_status, in repo-tree order.
 // The card flow reads cached (instant card-to-card navigation); the landing
 // page passes forceFresh so review counts reflect a just-approved item.
@@ -76,6 +125,10 @@ export async function getReviewQueue(forceFresh = false): Promise<QueueItem[]> {
   // of failed reads.
   if (items.length === 0 && cache && cache.items.length > 0) return cache.items;
 
+  // Bridge GitHub's read-after-write lag: re-apply any just-reviewed items the
+  // fresh read hasn't caught up to yet, so they don't resurface as "due".
+  overlayRecentReviews(items);
+
   cache = { items, at: now };
   return items;
 }
@@ -88,18 +141,34 @@ function byOldestReview(a: QueueItem, b: QueueItem): number {
 }
 
 export function categorize(items: QueueItem[], today: string): CategorizedQueue {
-  // Reviewed items surface by next due date; due items by how long it's been
-  // since the last visit, so the longest-waiting ideas come up first.
-  const reviewed = items
-    .filter((i) => i.status === "reviewed")
+  const reviewedAll = items.filter((i) => i.status === "reviewed");
+
+  // An idea reviewed today is settled for the day — its next visit is in the
+  // future, so it must not reappear in the actionable "due" list (the "already
+  // reviewed today" bug). Due items surface by how long it's been since their
+  // last visit, so the longest-waiting ideas come up first.
+  const dueForReview = reviewedAll
+    .filter(
+      (i) =>
+        i.nextReviewDate &&
+        i.nextReviewDate <= today &&
+        i.reviewedDate !== today
+    )
+    .sort(byOldestReview);
+
+  // Keep due and reviewed disjoint so a due idea is listed once (in "Review
+  // Again"), not echoed in the "Reviewed" log as a duplicate. Remaining
+  // reviewed items surface by next due date.
+  const duePaths = new Set(dueForReview.map((i) => i.path));
+  const reviewed = reviewedAll
+    .filter((i) => !duePaths.has(i.path))
     .sort((a, b) => (a.nextReviewDate || "").localeCompare(b.nextReviewDate || ""));
+
   return {
     unreviewed: items.filter((i) => i.status === "unreviewed"),
     contested: items.filter((i) => i.status === "contested"),
     reviewed,
-    dueForReview: reviewed
-      .filter((i) => i.nextReviewDate && i.nextReviewDate <= today)
-      .sort(byOldestReview),
+    dueForReview,
   };
 }
 
@@ -138,6 +207,18 @@ export function applyReviewToQueueCache(
   // Refresh the TTL: the patched cache is now more accurate than an immediate
   // refetch (GitHub reads can lag the write by a moment).
   cache.at = Date.now();
+
+  // Remember the review so a forceFresh rebuild (the landing page) can re-apply
+  // it while GitHub's read lags the commit, instead of resurrecting the card.
+  recentReviews.set(path, {
+    status: item.status,
+    reviewedDate: item.reviewedDate,
+    reviewCount: item.reviewCount,
+    reviewInterval: item.reviewInterval,
+    nextReviewDate: item.nextReviewDate,
+    isContest: action === "contest",
+    at: Date.now(),
+  });
 }
 
 function addDaysISO(iso: string, days: number): string {
