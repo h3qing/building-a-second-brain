@@ -51,6 +51,27 @@ if [ "$CURRENT_BRANCH" != "main" ]; then
   exit 0
 fi
 
+# Integrate remote main BEFORE committing the local tree. Another writer (the
+# review web app) commits review_status straight to remote main via the GitHub
+# Contents API; if we commit the stale local file on top without pulling first,
+# our PR reverts that review (lost update). Rebase keeps the sync/<ts> branch a
+# clean fast-forward of remote main.
+#
+# Safety contract preserved: rebasing the detached --git-dir/--work-tree replays
+# local commits onto origin/main IN THE WORK TREE. On a conflict we abort (which
+# restores the pre-rebase state) and bail — never leaving the tree half-merged,
+# never losing the local commit. If fetch fails (offline) we proceed on local
+# main exactly as before; the next online run reconciles.
+if g fetch origin main 2>> "$LOG"; then
+  if ! g rebase origin/main 2>> "$LOG"; then
+    g rebase --abort 2>> "$LOG"
+    log "ERROR: rebase onto origin/main hit a conflict — work tree restored, manual merge needed"
+    exit 1
+  fi
+else
+  log "WARN: fetch failed (offline?) — committing on local main, will reconcile next run"
+fi
+
 g add -A 2>> "$LOG"
 g diff --cached --quiet && exit 0   # nothing to commit → no empty branch/PR
 
