@@ -8,6 +8,8 @@ import {
 } from "@/lib/review-queue";
 import { spanLabel, daysBetween, timeUntil } from "@/lib/time";
 import { ReviewStats } from "@/app/components/ReviewStats";
+import { reviewAction } from "@/app/review/action";
+import { StarredFilter } from "./starred-filter";
 
 interface SourceGroup {
   source: string;
@@ -68,6 +70,7 @@ function CardSection({
   mode,
   tone,
   meta,
+  isLoggedIn,
 }: {
   title: string;
   subtitle?: string;
@@ -75,6 +78,7 @@ function CardSection({
   mode?: string;
   tone?: "accent" | "danger" | "muted";
   meta?: (item: QueueItem) => string | null;
+  isLoggedIn: boolean;
 }) {
   const totalCount = groups.reduce((sum, g) => sum + g.items.length, 0);
   const toneStyle =
@@ -85,9 +89,10 @@ function CardSection({
         : { color: "var(--ink-accent)" };
 
   return (
-    <section>
+    <section className="rq-section">
       <h2 className={subtitle ? "label mb-1" : "label mb-4"} style={toneStyle}>
-        {title} ({totalCount})
+        {title}{" "}
+        <span className="rq-section-count">({totalCount})</span>
       </h2>
       {subtitle && (
         <p className="text-sm text-muted mb-4" style={{ fontStyle: "italic" }}>
@@ -106,17 +111,53 @@ function CardSection({
               <div className="rq-card-grid">
                 {group.items.map((item) => {
                   const metaText = meta ? meta(item) : null;
+                  // The star form sits beside the <Link>, not inside it: a
+                  // <button> nested in an <a> is invalid and would hijack the
+                  // card's navigation. The wrapper positions the star over the
+                  // card corner; `data-starred` drives the starred filter.
                   return (
-                    <Link
+                    <div
                       key={item.path}
-                      href={cardHref(item.path, mode)}
-                      className={`rq-card rq-card-${group.type}`}
+                      className="rq-card-wrap"
+                      data-starred={item.starred ? "true" : "false"}
                     >
-                      <span className="rq-card-title">{item.title}</span>
-                      {metaText && (
-                        <span className="rq-card-meta">{metaText}</span>
+                      <Link
+                        href={cardHref(item.path, mode)}
+                        className={`rq-card rq-card-${group.type}`}
+                      >
+                        <span className="rq-card-title">{item.title}</span>
+                        {metaText && (
+                          <span className="rq-card-meta">{metaText}</span>
+                        )}
+                      </Link>
+                      {isLoggedIn ? (
+                        <form action={reviewAction} className="rq-star-form">
+                          <input type="hidden" name="path" value={item.path} />
+                          <input
+                            type="hidden"
+                            name="action"
+                            value={item.starred ? "unstar" : "star"}
+                          />
+                          <input type="hidden" name="returnTo" value="/review" />
+                          <button
+                            type="submit"
+                            className={`rq-star-btn${item.starred ? " is-starred" : ""}`}
+                            aria-label={
+                              item.starred ? "Remove star" : "Star this note"
+                            }
+                            title={item.starred ? "Starred" : "Star this note"}
+                          >
+                            {item.starred ? "★" : "☆"}
+                          </button>
+                        </form>
+                      ) : (
+                        item.starred && (
+                          <span className="rq-star-static" aria-label="Starred">
+                            ★
+                          </span>
+                        )
                       )}
-                    </Link>
+                    </div>
                   );
                 })}
               </div>
@@ -137,6 +178,8 @@ export default async function ReviewQueue() {
     allItems,
     today
   );
+
+  const starredCount = allItems.filter((i) => i.starred).length;
 
   // "it's been 3 weeks" — how long an idea has waited since its last visit
   const sinceReview = (item: QueueItem) =>
@@ -191,41 +234,47 @@ export default async function ReviewQueue() {
 
       {isLoggedIn && <ReviewStats />}
 
-      {unreviewed.length > 0 && (
-        <CardSection
-          title="Needs Review"
-          groups={groupBySource(unreviewed)}
-          tone="accent"
-        />
-      )}
+      <StarredFilter count={starredCount}>
+        {unreviewed.length > 0 && (
+          <CardSection
+            title="Needs Review"
+            groups={groupBySource(unreviewed)}
+            tone="accent"
+            isLoggedIn={isLoggedIn}
+          />
+        )}
 
-      {dueForReview.length > 0 && (
-        <CardSection
-          title="Review Again"
-          subtitle="Longest-waiting ideas first — give them some love."
-          groups={groupBySource(dueForReview, true)}
-          mode="rereview"
-          tone="accent"
-          meta={sinceReview}
-        />
-      )}
+        {dueForReview.length > 0 && (
+          <CardSection
+            title="Review Again"
+            subtitle="Longest-waiting ideas first — give them some love."
+            groups={groupBySource(dueForReview, true)}
+            mode="rereview"
+            tone="accent"
+            meta={sinceReview}
+            isLoggedIn={isLoggedIn}
+          />
+        )}
 
-      {contested.length > 0 && (
-        <CardSection
-          title="Contested"
-          groups={groupBySource(contested)}
-          tone="danger"
-        />
-      )}
+        {contested.length > 0 && (
+          <CardSection
+            title="Contested"
+            groups={groupBySource(contested)}
+            tone="danger"
+            isLoggedIn={isLoggedIn}
+          />
+        )}
 
-      {reviewed.length > 0 && (
-        <CardSection
-          title="Reviewed"
-          groups={groupBySource(reviewed)}
-          tone="muted"
-          meta={backWhen}
-        />
-      )}
+        {reviewed.length > 0 && (
+          <CardSection
+            title="Reviewed"
+            groups={groupBySource(reviewed)}
+            tone="muted"
+            meta={backWhen}
+            isLoggedIn={isLoggedIn}
+          />
+        )}
+      </StarredFilter>
 
       {allItems.length === 0 ? (
         // The vault always has notes once it's seeded — an empty fetch usually

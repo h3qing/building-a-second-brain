@@ -7,6 +7,7 @@ import { parseReviewItem } from "@/lib/parser";
 import { getReviewQueue, queueForCard, cardHref } from "@/lib/review-queue";
 import { ReviewCardForm } from "./insight-editor";
 import { IdeaJourney } from "./journey";
+import { reviewAction } from "@/app/review/action";
 
 export default async function CardReview({
   searchParams,
@@ -62,6 +63,10 @@ export default async function CardReview({
   // front, so completing one increments `done` while navigation keeps it.
   const nextForAction = nextPath ? cardHref(nextPath, navMode, done + 1) : "/review";
 
+  // Starring keeps you on the same card (it's not a review), so it returns here.
+  const selfHref = cardHref(currentPath, navMode, done);
+  const isStarred = item.frontmatter.starred === true;
+
   const pathParts = currentPath.split("/");
   const folder =
     pathParts.length >= 3 ? pathParts.slice(0, -1).join(" / ") : pathParts[0];
@@ -98,7 +103,30 @@ export default async function CardReview({
 
       {/* Title block */}
       <header className="space-y-2">
-        <div className="label">{folder}</div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="label">{folder}</div>
+          {isLoggedIn && (
+            <form action={reviewAction}>
+              <input type="hidden" name="path" value={currentPath} />
+              <input
+                type="hidden"
+                name="action"
+                value={isStarred ? "unstar" : "star"}
+              />
+              <input type="hidden" name="returnTo" value={selfHref} />
+              <input type="hidden" name="sha" value={item.sha} />
+              <input type="hidden" name="rawContent" value={item.rawContent} />
+              <button
+                type="submit"
+                className={`star-toggle${isStarred ? " is-starred" : ""}`}
+                aria-label={isStarred ? "Remove star" : "Star this note"}
+                title={isStarred ? "Starred" : "Star this note"}
+              >
+                {isStarred ? "★" : "☆"}
+              </button>
+            </form>
+          )}
+        </div>
         <h1
           className="font-heading tracking-tight leading-tight"
           style={{ fontSize: "2rem", fontWeight: 400 }}

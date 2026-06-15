@@ -6,6 +6,7 @@ import { getFileContent, updateFile } from "@/lib/github";
 import {
   updateReviewStatus,
   updateSpacedRepetition,
+  updateStarStatus,
   replaceInsight,
   type Difficulty,
 } from "@/lib/parser";
@@ -29,64 +30,57 @@ export async function reviewAction(formData: FormData) {
 
   const srActions: Difficulty[] = ["easy", "medium", "hard"];
   const isSR = srActions.includes(action as Difficulty);
+  const isStar = action === "star" || action === "unstar";
 
-  let updatedContent: string;
+  const validAction =
+    isSR || isStar || action === "approve" || action === "contest";
+  if (!validAction) {
+    redirect(returnTo || "/review");
+    return;
+  }
+
   const slug = path.split("/").pop()?.replace(".md", "") || "unknown";
 
-  // Apply custom insight to source before review status update
+  // Apply custom insight to source before review status update. Star toggles
+  // never carry an insight edit, so this stays a no-op for them.
   const applyInsight = (source: string): string =>
     insightChanged && customInsight
       ? replaceInsight(source, customInsight)
       : source;
 
-  if (isSR) {
-    const source = rawContent || (await getFileContent(path))?.content;
-    if (!source) redirect("/review");
-    updatedContent = updateSpacedRepetition(applyInsight(source!), action as Difficulty, today);
-  } else if (action === "approve" || action === "contest") {
-    const status = action === "approve" ? "reviewed" : "contested";
-    const source = rawContent || (await getFileContent(path))?.content;
-    if (!source) redirect("/review");
-    updatedContent = updateReviewStatus(applyInsight(source!), status, today);
-  } else {
-    redirect(returnTo || "/review");
-    return;
-  }
+  // Turn the current file contents into the committed version for this action.
+  // Computed from whichever source we have (form-supplied or freshly read).
+  const transform = (source: string): string => {
+    const base = applyInsight(source);
+    if (isSR) return updateSpacedRepetition(base, action as Difficulty, today);
+    if (isStar) return updateStarStatus(base, action === "star");
+    return updateReviewStatus(
+      base,
+      action === "approve" ? "reviewed" : "contested",
+      today
+    );
+  };
 
   const message = `review: ${action} "${slug}"`;
 
   // Fast path with SHA from form
   if (sha) {
-    const success = await updateFile(path, updatedContent!, sha, message);
+    const source = rawContent || (await getFileContent(path))?.content;
+    if (!source) redirect("/review");
+    const success = await updateFile(path, transform(source!), sha, message);
 
     if (!success) {
       // SHA was stale, re-read and retry once
       const freshFile = await getFileContent(path);
       if (freshFile) {
-        const base = applyInsight(freshFile.content);
-        const freshSource = isSR
-          ? updateSpacedRepetition(base, action as Difficulty, today)
-          : updateReviewStatus(
-              base,
-              action === "approve" ? "reviewed" : "contested",
-              today
-            );
-        await updateFile(path, freshSource, freshFile.sha, message);
+        await updateFile(path, transform(freshFile.content), freshFile.sha, message);
       }
     }
   } else {
     // Fallback: read from API
     const file = await getFileContent(path);
     if (!file) redirect("/review");
-    const base = applyInsight(file!.content);
-    const freshContent = isSR
-      ? updateSpacedRepetition(base, action as Difficulty, today)
-      : updateReviewStatus(
-          base,
-          action === "approve" ? "reviewed" : "contested",
-          today
-        );
-    await updateFile(path, freshContent, file!.sha, message);
+    await updateFile(path, transform(file!.content), file!.sha, message);
   }
 
   // Keep the in-memory queue cache in step with the commit so the next card
