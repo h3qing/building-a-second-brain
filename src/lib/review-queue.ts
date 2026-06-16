@@ -76,18 +76,17 @@ function overlayRecentReviews(items: QueueItem[]): void {
   }
 }
 
-// All idea + concept notes that carry a review_status, in repo-tree order.
-// The card flow reads cached (instant card-to-card navigation); the landing
-// page passes forceFresh so review counts reflect a just-approved item.
+// Idea notes that carry a review_status, in repo-tree order. Concepts are
+// deliberately excluded: they're lean hub nodes (a one-line definition plus
+// backlinks), so the spaced-repetition card has nothing to test recall on —
+// they belong in their own flow. The card flow reads cached (instant
+// card-to-card navigation); the landing page passes forceFresh so review
+// counts reflect a just-approved item.
 export async function getReviewQueue(forceFresh = false): Promise<QueueItem[]> {
   const now = Date.now();
   if (!forceFresh && cache && now - cache.at < TTL) return cache.items;
 
-  const [ideaPaths, conceptPaths] = await Promise.all([
-    listFiles("20 Ideas"),
-    listFiles("30 Concept"),
-  ]);
-  const allPaths = [...ideaPaths, ...conceptPaths];
+  const allPaths = await listFiles("20 Ideas");
 
   // An empty tree mid-session means GitHub errored (rate limit), not that the
   // vault is empty — serve the last known queue rather than zeroing out.
@@ -103,7 +102,7 @@ export async function getReviewQueue(forceFresh = false): Promise<QueueItem[]> {
     const { frontmatter, content } = parseFrontmatter(file.content);
     if (!frontmatter.review_status) continue;
 
-    const folder = path.startsWith("20 Ideas") ? "Ideas" : "Concepts";
+    const folder = "Ideas";
     const source =
       typeof frontmatter.source === "string"
         ? frontmatter.source.replace(/\[\[|\]\]/g, "").split("/").pop() || ""
