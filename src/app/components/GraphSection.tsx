@@ -41,6 +41,7 @@ export default function GraphSection({ data }: { data: GraphData }) {
   const [mode, setMode] = useState<Mode>("2d");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
 
   const filteredData = useMemo(
@@ -89,7 +90,13 @@ export default function GraphSection({ data }: { data: GraphData }) {
     }
   }, []);
 
-  const handleNodeClick = useCallback(
+  // Clicking a node opens a detail card instead of navigating away; the card's
+  // link performs the actual drill-in.
+  const handleNodeClick = useCallback((node: GraphNode) => {
+    setSelectedNode(node);
+  }, []);
+
+  const drillIn = useCallback(
     (node: GraphNode) => {
       if (node.type === "writing") {
         if (node.url) window.open(node.url, "_blank", "noopener,noreferrer");
@@ -101,6 +108,29 @@ export default function GraphSection({ data }: { data: GraphData }) {
     },
     [router]
   );
+
+  const drillInLabel = (node: GraphNode) =>
+    node.type === "writing"
+      ? "Read on the blog ↗"
+      : node.type === "concept"
+        ? "Open concept →"
+        : "Open idea →";
+
+  // Drop the selection if a search filters it out of view.
+  useEffect(() => {
+    if (selectedNode && !filteredData.nodes.some((n) => n.id === selectedNode.id)) {
+      setSelectedNode(null);
+    }
+  }, [filteredData, selectedNode]);
+
+  // Esc closes the detail card.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedNode(null);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <div
@@ -216,8 +246,8 @@ export default function GraphSection({ data }: { data: GraphData }) {
         </div>
       </div>
 
-      {/* Hover card */}
-      {hoveredNode && (
+      {/* Hover card — hidden while a node is selected (the detail card takes over) */}
+      {hoveredNode && !selectedNode && (
         <div className="absolute bottom-3 left-3 z-10 max-w-[280px] bg-background/95 border border-border rounded-lg p-3 backdrop-blur-sm">
           <div className="label mb-1" style={{ color: getNodeColor(hoveredNode) }}>
             {hoveredNode.type === "writing" ? "Essay" : hoveredNode.type}
@@ -243,6 +273,53 @@ export default function GraphSection({ data }: { data: GraphData }) {
               Read on the blog ↗
             </p>
           )}
+        </div>
+      )}
+
+      {/* Detail card — opened on click, with a drill-in link */}
+      {selectedNode && (
+        <div className="absolute bottom-3 left-3 z-20 w-[300px] max-w-[calc(100%-1.5rem)] bg-background/95 border border-border rounded-lg p-3.5 backdrop-blur-sm shadow-lg">
+          <button
+            type="button"
+            onClick={() => setSelectedNode(null)}
+            aria-label="Close"
+            className="absolute top-2.5 right-2.5 text-muted hover:text-foreground transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+          <div className="label mb-1" style={{ color: getNodeColor(selectedNode) }}>
+            {selectedNode.type === "writing" ? "Essay" : selectedNode.type}
+          </div>
+          <div className="font-heading font-semibold text-base mb-1.5 pr-5">
+            {selectedNode.title}
+          </div>
+          {selectedNode.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {selectedNode.tags.slice(0, 4).map((tag) => (
+                <span
+                  key={tag}
+                  className="text-xs px-1.5 py-0.5 border border-border rounded text-muted"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+          {selectedNode.excerpt && (
+            <p className="text-xs text-muted leading-relaxed mb-2.5 line-clamp-4">
+              {selectedNode.excerpt}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() => drillIn(selectedNode)}
+            className="text-sm font-medium hover:underline"
+            style={{ color: getNodeColor(selectedNode) }}
+          >
+            {drillInLabel(selectedNode)}
+          </button>
         </div>
       )}
     </div>
