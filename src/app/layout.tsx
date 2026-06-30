@@ -23,7 +23,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "Second Brain",
-  description: "A personal knowledge base built from 150+ books",
+  description: "A personal knowledge base built from books I've read",
 };
 
 export default function RootLayout({
