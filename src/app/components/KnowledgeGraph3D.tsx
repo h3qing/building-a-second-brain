@@ -21,15 +21,44 @@ interface KnowledgeGraph3DProps {
   dimensions: { width: number; height: number };
   // When set, only these nodes (a selected node + its neighbors) are shown.
   focusIds: Set<string> | null;
+  // Incrementing counter: each bump re-frames the whole graph (used by Reset view).
+  fitSignal: number;
   onNodeHover: (node: GraphNode | null) => void;
   onNodeClick: (node: GraphNode) => void;
   onBackgroundClick: () => void;
 }
 
-// A node's title only shows once the camera is within this fraction of the
-// graph radius — so labels reveal as you fly in, instead of cluttering the
-// zoomed-out overview. Tune up to reveal labels sooner.
-const LABEL_VISIBLE_FACTOR = 0.7;
+// Labels reveal as the camera approaches: fully shown within FULL×radius, fading
+// out by REVEAL×radius. The most-connected HUB_COUNT nodes are always labeled so
+// the map reads even when zoomed out. Tune these to taste.
+const LABEL_REVEAL_FACTOR = 1.15;
+const LABEL_FULL_FACTOR = 0.55;
+const HUB_COUNT = 12;
+// How far the camera sits from a node when you click to focus it.
+const FOCUS_CAMERA_DISTANCE = 90;
+
+function makeNodeMesh(n: GraphNode, hit: boolean): THREE.Mesh {
+  const base = getNodeSize(n);
+  const color = hit ? SEARCH_HIT_COLOR : getNodeColor(n);
+  // Distinct silhouette per type: faceted gem = concept, smooth orb = idea,
+  // diamond (octahedron) = essay.
+  let geometry: THREE.BufferGeometry;
+  if (n.type === "concept") {
+    geometry = new THREE.IcosahedronGeometry(base * 1.15, 0);
+  } else if (n.type === "writing") {
+    geometry = new THREE.OctahedronGeometry(base * 1.4, 0);
+  } else {
+    geometry = new THREE.SphereGeometry(base * 0.95, 16, 16);
+  }
+  const material = new THREE.MeshStandardMaterial({
+    color,
+    emissive: new THREE.Color(color),
+    emissiveIntensity: hit ? 0.6 : 0.35,
+    roughness: 0.45,
+    metalness: 0.1,
+  });
+  return new THREE.Mesh(geometry, material);
+}
 
 function makeLabel(n: GraphNode): SpriteText {
   const text = n.title.length > 30 ? `${n.title.slice(0, 30)}…` : n.title;
@@ -39,12 +68,13 @@ function makeLabel(n: GraphNode): SpriteText {
   label.padding = 2;
   label.borderRadius = 3;
   label.textHeight = 5;
-  // Float the label above the node (essays are larger octahedra).
-  const size = getNodeSize(n);
-  label.position.set(0, size + (n.type === "writing" ? size * 0.9 : 4), 0);
+  label.position.set(0, getNodeSize(n) * 1.6 + 3, 0);
+  label.material.transparent = true;
+  label.material.opacity = 0;
   label.visible = false; // revealed by distance / focus, see updateLabels()
   label.userData.isNodeLabel = true;
   label.userData.nodeId = n.id;
+  label.userData.linkCount = n.linkCount;
   label.renderOrder = 10;
   return label;
 }
@@ -54,12 +84,14 @@ export default function KnowledgeGraph3D({
   searchQuery,
   dimensions,
   focusIds,
+  fitSignal,
   onNodeHover,
   onNodeClick,
   onBackgroundClick,
 }: KnowledgeGraph3DProps) {
   const fgRef = useRef<any>(null);
-  const thresholdRef = useRef(90);
+  const radiusRef = useRef(120);
+  const hubCutoffRef = useRef(Infinity);
   // Mirror focusIds into a ref so the controls-change handler reads the latest.
   const focusRef = useRef<Set<string> | null>(focusIds);
   const query = searchQuery.trim().toLowerCase();
@@ -69,37 +101,20 @@ export default function KnowledgeGraph3D({
     [query]
   );
 
-  // Essays render as octahedra (the 3D echo of the 2D diamond) with a label;
-  // concepts and ideas keep the library's default sphere (via nodeVal/nodeColor)
-  // and get the label appended on top (nodeThreeObjectExtend below).
+  // Every node is a custom group: a type-specific mesh plus its label.
   const nodeThreeObject = useCallback(
     (node: any) => {
       const n = node as GraphNode;
-      const label = makeLabel(n);
-      if (n.type !== "writing") return label;
-
-      const size = getNodeSize(n) * 1.4;
-      const color = isSearchHit(n) ? SEARCH_HIT_COLOR : getNodeColor(n);
       const group = new THREE.Group();
-      group.add(
-        new THREE.Mesh(
-          new THREE.OctahedronGeometry(size),
-          new THREE.MeshLambertMaterial({ color })
-        )
-      );
-      group.add(label);
+      group.add(makeNodeMesh(n, isSearchHit(n)));
+      group.add(makeLabel(n));
       return group;
     },
     [isSearchHit]
   );
 
-  const nodeThreeObjectExtend = useCallback(
-    (node: any) => (node as GraphNode).type !== "writing",
-    []
-  );
-
-  // Label visibility: in focus mode, always show the focused nodes' labels;
-  // otherwise reveal a label only when the camera is close enough to it.
+  // Label visibility: in focus mode show exactly the focused nodes' labels;
+  // otherwise fade each label in as the camera approaches, and always show hubs.
   const updateLabels = useCallback(() => {
     const fg = fgRef.current;
     if (!fg) return;
@@ -107,28 +122,46 @@ export default function KnowledgeGraph3D({
     const scene = fg.scene?.();
     if (!cam || !scene) return;
     const world = new THREE.Vector3();
-    const threshold = thresholdRef.current;
     const focus = focusRef.current;
+    const revealDist = radiusRef.current * LABEL_REVEAL_FACTOR;
+    const fullDist = radiusRef.current * LABEL_FULL_FACTOR;
     scene.traverse((obj: any) => {
       if (!obj.userData?.isNodeLabel) return;
       if (focus) {
-        obj.visible = focus.has(obj.userData.nodeId);
+        const on = focus.has(obj.userData.nodeId);
+        obj.visible = on;
+        obj.material.opacity = on ? 1 : 0;
+        return;
+      }
+      let opacity: number;
+      if (obj.userData.linkCount >= hubCutoffRef.current) {
+        opacity = 1; // hubs anchor the map — always legible
       } else {
         obj.getWorldPosition(world);
-        obj.visible = world.distanceTo(cam.position) < threshold;
+        const d = world.distanceTo(cam.position);
+        if (d >= revealDist) opacity = 0;
+        else if (d <= fullDist) opacity = 1;
+        else opacity = (revealDist - d) / (revealDist - fullDist);
       }
+      obj.material.opacity = opacity;
+      obj.visible = opacity > 0.04;
     });
   }, []);
 
   // Once the simulation settles, size the reveal distance to the actual graph
-  // extent so it works regardless of node count / force scale.
+  // extent and pick the hub cutoff (the HUB_COUNT-th highest link count).
   const handleEngineStop = useCallback(() => {
     let radius = 0;
+    const counts: number[] = [];
     for (const n of data.nodes as Array<GraphNode & { x?: number; y?: number; z?: number }>) {
-      const d = Math.hypot(n.x ?? 0, n.y ?? 0, n.z ?? 0);
-      if (d > radius) radius = d;
+      radius = Math.max(radius, Math.hypot(n.x ?? 0, n.y ?? 0, n.z ?? 0));
+      counts.push(n.linkCount ?? 0);
     }
-    thresholdRef.current = radius > 0 ? radius * LABEL_VISIBLE_FACTOR : 90;
+    radiusRef.current = radius > 0 ? radius : 120;
+    counts.sort((a, b) => b - a);
+    hubCutoffRef.current = counts.length
+      ? counts[Math.min(HUB_COUNT, counts.length) - 1] || 1
+      : Infinity;
     updateLabels();
   }, [data.nodes, updateLabels]);
 
@@ -145,6 +178,11 @@ export default function KnowledgeGraph3D({
     focusRef.current = focusIds;
     updateLabels();
   }, [focusIds, updateLabels]);
+
+  // Reset view: smoothly re-frame the whole graph.
+  useEffect(() => {
+    if (fitSignal > 0) fgRef.current?.zoomToFit?.(800);
+  }, [fitSignal]);
 
   // Focus mode: hide nodes (and links) outside the selected node's neighborhood.
   const nodeVisibility = useCallback(
@@ -172,8 +210,24 @@ export default function KnowledgeGraph3D({
     [onNodeHover]
   );
 
+  // Clicking a node flies the camera in to frame it, then selects it.
   const handleClick = useCallback(
-    (node: any) => onNodeClick(node as GraphNode),
+    (node: any) => {
+      const fg = fgRef.current;
+      if (fg && node) {
+        const x = node.x ?? 0;
+        const y = node.y ?? 0;
+        const z = node.z ?? 0;
+        const dist = Math.hypot(x, y, z) || 1;
+        const ratio = 1 + FOCUS_CAMERA_DISTANCE / dist;
+        fg.cameraPosition(
+          { x: x * ratio, y: y * ratio, z: z * ratio },
+          { x, y, z },
+          900
+        );
+      }
+      onNodeClick(node as GraphNode);
+    },
     [onNodeClick]
   );
 
@@ -186,16 +240,9 @@ export default function KnowledgeGraph3D({
         graphData={data}
         nodeId="id"
         nodeLabel=""
-        nodeVal={(n: any) => getNodeSize(n as GraphNode)}
-        nodeColor={(n: any) =>
-          isSearchHit(n as GraphNode)
-            ? SEARCH_HIT_COLOR
-            : getNodeColor(n as GraphNode)
-        }
-        nodeOpacity={0.92}
         nodeVisibility={nodeVisibility}
         nodeThreeObject={nodeThreeObject}
-        nodeThreeObjectExtend={nodeThreeObjectExtend}
+        nodeThreeObjectExtend={false}
         onEngineStop={handleEngineStop}
         linkColor={() => "rgba(180, 168, 148, 0.35)"}
         linkWidth={0.5}

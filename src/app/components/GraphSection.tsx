@@ -43,6 +43,7 @@ export default function GraphSection({ data }: { data: GraphData }) {
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
+  const [fitSignal, setFitSignal] = useState(0);
 
   const filteredData = useMemo(
     () => filterGraph(data, searchQuery),
@@ -64,6 +65,12 @@ export default function GraphSection({ data }: { data: GraphData }) {
   }, [selectedNode, filteredData.links]);
 
   const clearSelection = useCallback(() => setSelectedNode(null), []);
+
+  // Reset view: clear any focus and re-fit the whole graph.
+  const resetView = useCallback(() => {
+    setSelectedNode(null);
+    setFitSignal((s) => s + 1);
+  }, []);
 
   const updateDimensions = useCallback(() => {
     const el = containerRef.current;
@@ -187,6 +194,18 @@ export default function GraphSection({ data }: { data: GraphData }) {
         </div>
         <button
           type="button"
+          onClick={resetView}
+          aria-label="Reset view"
+          title="Reset view"
+          className="flex items-center justify-center w-7 h-7 bg-background/90 border border-border rounded-md backdrop-blur-sm text-muted hover:text-accent transition-colors"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+            <path d="M3 3v5h5" />
+          </svg>
+        </button>
+        <button
+          type="button"
           onClick={toggleFullscreen}
           aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
           className="flex items-center justify-center w-7 h-7 bg-background/90 border border-border rounded-md backdrop-blur-sm text-muted hover:text-accent transition-colors"
@@ -227,6 +246,7 @@ export default function GraphSection({ data }: { data: GraphData }) {
             searchQuery={searchQuery}
             dimensions={dimensions}
             focusIds={focusIds}
+            fitSignal={fitSignal}
             onNodeHover={setHoveredNode}
             onNodeClick={handleNodeClick}
             onBackgroundClick={clearSelection}
@@ -239,6 +259,7 @@ export default function GraphSection({ data }: { data: GraphData }) {
           dimensions={dimensions}
           hoveredNode={hoveredNode}
           focusIds={focusIds}
+          fitSignal={fitSignal}
           onNodeHover={setHoveredNode}
           onNodeClick={handleNodeClick}
           onBackgroundClick={clearSelection}
