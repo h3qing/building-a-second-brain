@@ -19,8 +19,11 @@ interface KnowledgeGraph3DProps {
   data: FilteredGraph;
   searchQuery: string;
   dimensions: { width: number; height: number };
+  // When set, only these nodes (a selected node + its neighbors) are shown.
+  focusIds: Set<string> | null;
   onNodeHover: (node: GraphNode | null) => void;
   onNodeClick: (node: GraphNode) => void;
+  onBackgroundClick: () => void;
 }
 
 // A node's title only shows once the camera is within this fraction of the
@@ -39,8 +42,9 @@ function makeLabel(n: GraphNode): SpriteText {
   // Float the label above the node (essays are larger octahedra).
   const size = getNodeSize(n);
   label.position.set(0, size + (n.type === "writing" ? size * 0.9 : 4), 0);
-  label.visible = false; // revealed by distance, see updateLabels()
+  label.visible = false; // revealed by distance / focus, see updateLabels()
   label.userData.isNodeLabel = true;
+  label.userData.nodeId = n.id;
   label.renderOrder = 10;
   return label;
 }
@@ -49,11 +53,15 @@ export default function KnowledgeGraph3D({
   data,
   searchQuery,
   dimensions,
+  focusIds,
   onNodeHover,
   onNodeClick,
+  onBackgroundClick,
 }: KnowledgeGraph3DProps) {
   const fgRef = useRef<any>(null);
   const thresholdRef = useRef(90);
+  // Mirror focusIds into a ref so the controls-change handler reads the latest.
+  const focusRef = useRef<Set<string> | null>(focusIds);
   const query = searchQuery.trim().toLowerCase();
 
   const isSearchHit = useCallback(
@@ -90,7 +98,8 @@ export default function KnowledgeGraph3D({
     []
   );
 
-  // Show a node's label only when the camera is close enough to it.
+  // Label visibility: in focus mode, always show the focused nodes' labels;
+  // otherwise reveal a label only when the camera is close enough to it.
   const updateLabels = useCallback(() => {
     const fg = fgRef.current;
     if (!fg) return;
@@ -99,8 +108,12 @@ export default function KnowledgeGraph3D({
     if (!cam || !scene) return;
     const world = new THREE.Vector3();
     const threshold = thresholdRef.current;
+    const focus = focusRef.current;
     scene.traverse((obj: any) => {
-      if (obj.userData?.isNodeLabel) {
+      if (!obj.userData?.isNodeLabel) return;
+      if (focus) {
+        obj.visible = focus.has(obj.userData.nodeId);
+      } else {
         obj.getWorldPosition(world);
         obj.visible = world.distanceTo(cam.position) < threshold;
       }
@@ -126,6 +139,30 @@ export default function KnowledgeGraph3D({
     controls.addEventListener("change", updateLabels);
     return () => controls.removeEventListener("change", updateLabels);
   }, [updateLabels]);
+
+  // When the focus set changes, re-apply label visibility immediately.
+  useEffect(() => {
+    focusRef.current = focusIds;
+    updateLabels();
+  }, [focusIds, updateLabels]);
+
+  // Focus mode: hide nodes (and links) outside the selected node's neighborhood.
+  const nodeVisibility = useCallback(
+    (node: any) => !focusIds || focusIds.has((node as GraphNode).id),
+    [focusIds]
+  );
+
+  const linkVisibility = useCallback(
+    (link: any) => {
+      if (!focusIds) return true;
+      const s = link.source;
+      const t = link.target;
+      const sid = typeof s === "string" ? s : s?.id;
+      const tid = typeof t === "string" ? t : t?.id;
+      return focusIds.has(sid) && focusIds.has(tid);
+    },
+    [focusIds]
+  );
 
   const handleHover = useCallback(
     (node: any) => {
@@ -156,14 +193,17 @@ export default function KnowledgeGraph3D({
             : getNodeColor(n as GraphNode)
         }
         nodeOpacity={0.92}
+        nodeVisibility={nodeVisibility}
         nodeThreeObject={nodeThreeObject}
         nodeThreeObjectExtend={nodeThreeObjectExtend}
         onEngineStop={handleEngineStop}
         linkColor={() => "rgba(180, 168, 148, 0.35)"}
         linkWidth={0.5}
         linkOpacity={0.4}
+        linkVisibility={linkVisibility}
         onNodeHover={handleHover}
         onNodeClick={handleClick}
+        onBackgroundClick={onBackgroundClick}
         enableNodeDrag={false}
         showNavInfo={false}
         backgroundColor="rgba(0,0,0,0)"
