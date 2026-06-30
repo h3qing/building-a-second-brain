@@ -12,6 +12,13 @@ export default async function Home() {
     parsePipelineFeed(),
   ]);
 
+  // The vault always has content, so zero nodes means the GitHub fetch failed
+  // (e.g. a transient rate limit). Throw rather than render an empty page —
+  // ISR then keeps serving the last good page instead of caching the empty one.
+  if (graphData.nodes.length === 0) {
+    throw new Error("Knowledge graph data unavailable (GitHub fetch returned no nodes)");
+  }
+
   const essaysCount = graphData.nodes.filter((n) => n.type === "writing").length;
   const reviewedCount = graphData.nodes.length - essaysCount;
   const totalLinks = graphData.stats.totalLinks;
@@ -69,7 +76,7 @@ export default async function Home() {
           Heqing&apos;s Knowledge Base
         </h1>
         <p className="text-muted mt-2" style={{ fontSize: "1.05rem", lineHeight: 1.7 }}>
-          150+ books processed through an AI-assisted extraction pipeline.
+          Books processed through an AI-assisted extraction pipeline.
           Human-reviewed. Open source.
         </p>
       </div>
@@ -100,12 +107,6 @@ export default async function Home() {
               <span className="text-muted ml-1.5">essays</span>
             </div>
           )}
-          <div>
-            <span className="text-2xl font-heading text-accent">
-              150+
-            </span>
-            <span className="text-muted ml-1.5">books</span>
-          </div>
         </div>
       )}
 

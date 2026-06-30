@@ -213,7 +213,7 @@ export default function PipelineDiagram() {
         textAlign: "center" as const,
         fontStyle: "italic",
       }}>
-        150+ books in the vault. The graph grows as you review.
+        The graph grows as you review.
         Fork this project on <a href="https://github.com/h3qing/second-brain" style={{ color: "var(--ink-accent)" }}>GitHub</a>.
       </div>
     </div>

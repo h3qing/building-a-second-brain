@@ -3,7 +3,7 @@ import { loginAction } from "./action";
 const messages = [
   "This is Heqing's second brain. Visitors welcome, but only he has the keys. Fork it and build your own.",
   "You found the secret door. Unfortunately, it only opens for one person. But the blueprints are open source.",
-  "150+ books live here. One PIN protects them. Yours could too — fork the repo.",
+  "A vault of books, ideas, and essays lives here. One PIN protects it. Yours could too — fork the repo.",
   "This brain is spoken for. But github.com/h3qing/second-brain is free for the taking.",
   "Plot twist: the real second brain is the one you build yourself. Fork this project and start reading.",
   "Heqing reads a lot. This is where the ideas go to be reviewed. You can build your own version.",
