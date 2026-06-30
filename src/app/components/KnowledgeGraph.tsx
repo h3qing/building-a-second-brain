@@ -26,6 +26,8 @@ interface KnowledgeGraphProps {
   hoveredNode: GraphNode | null;
   // When set, only these nodes (a selected node + its neighbors) are drawn.
   focusIds: Set<string> | null;
+  // Incrementing counter: each bump re-fits the graph (used by Reset view).
+  fitSignal: number;
   onNodeHover: (node: GraphNode | null) => void;
   onNodeClick: (node: GraphNode) => void;
   onBackgroundClick: () => void;
@@ -37,11 +39,17 @@ export default function KnowledgeGraph({
   dimensions,
   hoveredNode,
   focusIds,
+  fitSignal,
   onNodeHover,
   onNodeClick,
   onBackgroundClick,
 }: KnowledgeGraphProps) {
   const fgRef = useRef<any>(null);
+
+  // Reset view: smoothly re-fit the whole graph.
+  useEffect(() => {
+    if (fitSignal > 0) fgRef.current?.zoomToFit?.(600, 60);
+  }, [fitSignal]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
