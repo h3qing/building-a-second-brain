@@ -24,8 +24,11 @@ interface KnowledgeGraphProps {
   searchQuery: string;
   dimensions: { width: number; height: number };
   hoveredNode: GraphNode | null;
+  // When set, only these nodes (a selected node + its neighbors) are drawn.
+  focusIds: Set<string> | null;
   onNodeHover: (node: GraphNode | null) => void;
   onNodeClick: (node: GraphNode) => void;
+  onBackgroundClick: () => void;
 }
 
 export default function KnowledgeGraph({
@@ -33,8 +36,10 @@ export default function KnowledgeGraph({
   searchQuery,
   dimensions,
   hoveredNode,
+  focusIds,
   onNodeHover,
   onNodeClick,
+  onBackgroundClick,
 }: KnowledgeGraphProps) {
   const fgRef = useRef<any>(null);
 
@@ -77,6 +82,8 @@ export default function KnowledgeGraph({
   const nodeCanvasObject = useCallback(
     (node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const graphNode = node as GraphNode;
+      // Focus mode: hide everything except the selected node and its neighbors.
+      if (focusIds && !focusIds.has(graphNode.id)) return;
       const color = getNodeColor(graphNode);
       const nodeSize = getNodeSize(graphNode);
       const isHovered = hoveredNode?.id === graphNode.id;
@@ -124,6 +131,7 @@ export default function KnowledgeGraph({
       // Keep the default view clean: labels on hover/search always, essays on a
       // gentle zoom-in (they're the highlight), other nodes only when zoomed further.
       const shouldRenderLabel =
+        !!focusIds || // in focus mode every visible node is labeled
         isHovered ||
         isSearchHit ||
         globalScale > 2.2 ||
@@ -155,7 +163,7 @@ export default function KnowledgeGraph({
       ctx.fillStyle = "rgba(250, 248, 245, 0.95)";
       ctx.fillText(rawLabel, node.x || 0, y);
     },
-    [hoveredNode, searchQuery]
+    [hoveredNode, searchQuery, focusIds]
   );
 
   const linkCanvasObject = useCallback(
@@ -163,6 +171,11 @@ export default function KnowledgeGraph({
       // Force-graph adds x/y to nodes at runtime; the static type omits them.
       const source = link.source as GraphNode & { x?: number; y?: number };
       const target = link.target as GraphNode & { x?: number; y?: number };
+
+      // Focus mode: only draw links between two visible (focus) nodes.
+      if (focusIds && !(focusIds.has(source.id) && focusIds.has(target.id))) {
+        return;
+      }
 
       if (
         source.x === undefined ||
@@ -186,7 +199,7 @@ export default function KnowledgeGraph({
       ctx.lineWidth = connectedToHovered ? 1.6 / globalScale : 0.8 / globalScale;
       ctx.stroke();
     },
-    [hoveredNode]
+    [hoveredNode, focusIds]
   );
 
   return (
@@ -206,6 +219,8 @@ export default function KnowledgeGraph({
         nodeLabel=""
         nodeCanvasObject={nodeCanvasObject}
         nodePointerAreaPaint={(node: any, color: string, ctx: CanvasRenderingContext2D) => {
+          // Hidden nodes get no pointer area, so they can't be hovered/clicked.
+          if (focusIds && !focusIds.has((node as GraphNode).id)) return;
           const size = Math.max(8, 4 + Math.sqrt(node.linkCount + 1) * 2.1);
           ctx.beginPath();
           ctx.arc(node.x || 0, node.y || 0, size + 18, 0, 2 * Math.PI);
@@ -216,6 +231,7 @@ export default function KnowledgeGraph({
         linkDirectionalParticles={0}
         onNodeClick={handleNodeClickInternal}
         onNodeHover={handleNodeHover}
+        onBackgroundClick={onBackgroundClick}
         enableNodeDrag={true}
         enableZoomInteraction={true}
         enablePanInteraction={true}

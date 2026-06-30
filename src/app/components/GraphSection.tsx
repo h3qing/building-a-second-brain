@@ -49,6 +49,22 @@ export default function GraphSection({ data }: { data: GraphData }) {
     [data, searchQuery]
   );
 
+  // The selected node + its immediate neighbors. When set, the renderers hide
+  // everything else and label the rest.
+  const focusIds = useMemo(() => {
+    if (!selectedNode) return null;
+    const ids = new Set<string>([selectedNode.id]);
+    for (const link of filteredData.links) {
+      const s = typeof link.source === "string" ? link.source : (link.source as GraphNode).id;
+      const t = typeof link.target === "string" ? link.target : (link.target as GraphNode).id;
+      if (s === selectedNode.id) ids.add(t);
+      else if (t === selectedNode.id) ids.add(s);
+    }
+    return ids;
+  }, [selectedNode, filteredData.links]);
+
+  const clearSelection = useCallback(() => setSelectedNode(null), []);
+
   const updateDimensions = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -210,8 +226,10 @@ export default function GraphSection({ data }: { data: GraphData }) {
             data={filteredData}
             searchQuery={searchQuery}
             dimensions={dimensions}
+            focusIds={focusIds}
             onNodeHover={setHoveredNode}
             onNodeClick={handleNodeClick}
+            onBackgroundClick={clearSelection}
           />
         </GraphErrorBoundary>
       ) : (
@@ -220,8 +238,10 @@ export default function GraphSection({ data }: { data: GraphData }) {
           searchQuery={searchQuery}
           dimensions={dimensions}
           hoveredNode={hoveredNode}
+          focusIds={focusIds}
           onNodeHover={setHoveredNode}
           onNodeClick={handleNodeClick}
+          onBackgroundClick={clearSelection}
         />
       )}
 
