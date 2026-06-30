@@ -34,6 +34,90 @@ export interface GraphData {
 
 const WIKILINK_RE = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
 
+// ---- Rendering helpers (shared by the 2D and 3D graph renderers) ----
+
+// Warm palette matching the Ink & Parchment theme.
+export const TAG_COLORS: Record<string, string> = {
+  negotiation: "#c47a5a",
+  hiring: "#7b9eb8",
+  decision: "#9b7eb8",
+  organization: "#7ba87e",
+  competence: "#c4a05a",
+  leadership: "#b87a7a",
+  productivity: "#8ba87b",
+  default: "#a09080",
+};
+
+export const CONCEPT_COLOR = "#8b6914"; // gold — synthesized concepts
+export const IDEA_COLOR = "#a09080"; // tan — atomic ideas
+export const WRITING_COLOR = "#b5603f"; // clay — published essays (diamonds/octahedra)
+export const SEARCH_HIT_COLOR = "#c49a2e"; // golden highlight for search matches
+
+export function getNodeColor(node: GraphNode): string {
+  // Essays read as one category regardless of tags.
+  if (node.type === "writing") return WRITING_COLOR;
+  if (node.color) return node.color;
+  for (const tag of node.tags) {
+    const normalized = tag.toLowerCase().replace(/\s+/g, "");
+    if (TAG_COLORS[normalized]) return TAG_COLORS[normalized];
+  }
+  return node.type === "concept" ? CONCEPT_COLOR : IDEA_COLOR;
+}
+
+// Node radius from connectivity — shared so 2D and 3D size nodes identically.
+export function getNodeSize(node: GraphNode): number {
+  return Math.max(4, 3 + Math.sqrt(node.linkCount + 1) * 1.8);
+}
+
+export interface FilteredGraph {
+  nodes: GraphNode[];
+  links: GraphLink[];
+}
+
+// react-force-graph mutates link endpoints from ids into node objects at runtime,
+// so accept either shape.
+function endpointId(end: string | GraphNode): string {
+  return typeof end === "string" ? end : end.id;
+}
+
+// Drop orphans, then (when searching) keep title/tag matches plus their 1-hop
+// neighbors, pruning links to those between visible nodes. Pure — returns new
+// arrays, never mutates the input.
+export function filterGraph(data: GraphData, query: string): FilteredGraph {
+  let nodes = data.nodes.filter((n) => !n.isOrphan);
+  const q = query.trim().toLowerCase();
+
+  if (q) {
+    const matchedIds = new Set(
+      nodes
+        .filter(
+          (n) =>
+            n.title.toLowerCase().includes(q) ||
+            n.tags.some((t) => t.toLowerCase().includes(q))
+        )
+        .map((n) => n.id)
+    );
+
+    for (const link of data.links) {
+      const sourceId = endpointId(link.source);
+      const targetId = endpointId(link.target);
+      if (matchedIds.has(sourceId)) matchedIds.add(targetId);
+      if (matchedIds.has(targetId)) matchedIds.add(sourceId);
+    }
+
+    nodes = nodes.filter((n) => matchedIds.has(n.id));
+  }
+
+  const nodeIds = new Set(nodes.map((n) => n.id));
+  const links = data.links.filter((link) => {
+    const sourceId = endpointId(link.source);
+    const targetId = endpointId(link.target);
+    return nodeIds.has(sourceId) && nodeIds.has(targetId);
+  });
+
+  return { nodes, links };
+}
+
 function slugify(name: string): string {
   return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
