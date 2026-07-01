@@ -40,22 +40,27 @@ const FOCUS_CAMERA_DISTANCE = 90;
 function makeNodeMesh(n: GraphNode, hit: boolean): THREE.Mesh {
   const base = getNodeSize(n);
   const color = hit ? SEARCH_HIT_COLOR : getNodeColor(n);
-  // Distinct silhouette per type: faceted gem = concept, smooth orb = idea,
-  // diamond (octahedron) = essay.
+  // Distinct silhouette per type: rounded gem = concept, smooth orb = idea,
+  // crisp diamond (octahedron) = essay. Higher subdivision reads as polished,
+  // not low-poly.
   let geometry: THREE.BufferGeometry;
   if (n.type === "concept") {
-    geometry = new THREE.IcosahedronGeometry(base * 1.15, 0);
+    geometry = new THREE.IcosahedronGeometry(base * 1.15, 1);
   } else if (n.type === "writing") {
     geometry = new THREE.OctahedronGeometry(base * 1.4, 0);
   } else {
-    geometry = new THREE.SphereGeometry(base * 0.95, 16, 16);
+    geometry = new THREE.SphereGeometry(base * 0.95, 32, 32);
   }
-  const material = new THREE.MeshStandardMaterial({
+  // Physical material with a soft clearcoat sheen + faint inner glow — a sleek,
+  // modern finish rather than a flat/neon look.
+  const material = new THREE.MeshPhysicalMaterial({
     color,
     emissive: new THREE.Color(color),
-    emissiveIntensity: hit ? 0.6 : 0.35,
-    roughness: 0.45,
-    metalness: 0.1,
+    emissiveIntensity: hit ? 0.5 : 0.2,
+    roughness: 0.3,
+    metalness: 0.0,
+    clearcoat: 0.8,
+    clearcoatRoughness: 0.35,
   });
   return new THREE.Mesh(geometry, material);
 }
