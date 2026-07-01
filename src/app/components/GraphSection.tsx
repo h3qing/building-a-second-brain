@@ -271,18 +271,29 @@ export default function GraphSection({ data }: { data: GraphData }) {
         <div className="text-xs text-muted bg-background/90 border border-border rounded-full px-3 py-1 backdrop-blur-sm">
           {filteredData.nodes.length} nodes · {filteredData.links.length} links
         </div>
-        <div className="flex items-center gap-3 text-xs text-muted bg-background/90 border border-border rounded-full px-3 py-1 backdrop-blur-sm">
-          <span className="flex items-center gap-1.5">
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: CONCEPT_COLOR }} />
-            concept
+        <div className="flex flex-col gap-1 text-xs bg-background/90 border border-border rounded-lg px-3 py-2 backdrop-blur-sm">
+          <span className="flex items-center gap-2">
+            <span className="w-3 flex items-center justify-center">
+              <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
+                <polygon points="6,0.5 10.8,3.25 10.8,8.75 6,11.5 1.2,8.75 1.2,3.25" fill={CONCEPT_COLOR} />
+              </svg>
+            </span>
+            <span className="text-foreground">concept</span>
+            <span className="text-muted">synthesized</span>
           </span>
-          <span className="flex items-center gap-1.5">
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: IDEA_COLOR }} />
-            idea
+          <span className="flex items-center gap-2">
+            <span className="w-3 flex items-center justify-center">
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: IDEA_COLOR }} />
+            </span>
+            <span className="text-foreground">idea</span>
+            <span className="text-muted">atomic insight</span>
           </span>
-          <span className="flex items-center gap-1.5">
-            <span style={{ width: 7, height: 7, background: WRITING_COLOR, transform: "rotate(45deg)" }} />
-            essay
+          <span className="flex items-center gap-2">
+            <span className="w-3 flex items-center justify-center">
+              <span style={{ width: 9, height: 9, background: WRITING_COLOR, transform: "rotate(45deg)" }} />
+            </span>
+            <span className="text-foreground">essay</span>
+            <span className="text-muted">published</span>
           </span>
         </div>
       </div>
