@@ -108,6 +108,7 @@ export default function KnowledgeGraph({
       const cy = node.y || 0;
       const r = isHovered ? nodeSize + 1.3 : nodeSize;
       const isWriting = graphNode.type === "writing";
+      const isSource = graphNode.type === "source";
 
       ctx.beginPath();
       if (isWriting) {
@@ -118,6 +119,10 @@ export default function KnowledgeGraph({
         ctx.lineTo(cx, cy + d);
         ctx.lineTo(cx - d, cy);
         ctx.closePath();
+      } else if (isSource) {
+        // Squares mark sources (books/podcasts) — the hubs ideas hang off.
+        const s = r * 0.95;
+        ctx.rect(cx - s, cy - s, s * 2, s * 2);
       } else {
         ctx.arc(cx, cy, r, 0, 2 * Math.PI);
       }
@@ -141,14 +146,15 @@ export default function KnowledgeGraph({
       ctx.strokeStyle = isHovered ? color : "rgba(180, 168, 148, 0.3)";
       ctx.stroke();
 
-      // Keep the default view clean: labels on hover/search always, essays on a
-      // gentle zoom-in (they're the highlight), other nodes only when zoomed further.
+      // Keep the default view clean: labels on hover/search always, essays and
+      // sources on a gentle zoom-in (they anchor the map), other nodes only
+      // when zoomed further.
       const shouldRenderLabel =
         !!focusIds || // in focus mode every visible node is labeled
         isHovered ||
         isSearchHit ||
         globalScale > 2.2 ||
-        (isWriting && globalScale > 1.35);
+        ((isWriting || isSource) && globalScale > 1.35);
       if (!shouldRenderLabel) return;
 
       const rawLabel =

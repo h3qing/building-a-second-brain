@@ -47,13 +47,15 @@ function makeNodeMesh(n: GraphNode, hit: boolean): THREE.Mesh {
   const base = getNodeSize(n);
   const color = hit ? SEARCH_HIT_COLOR : getNodeColor(n);
   // Distinct silhouette per type: rounded gem = concept, smooth orb = idea,
-  // crisp diamond (octahedron) = essay. Higher subdivision reads as polished,
-  // not low-poly.
+  // crisp diamond (octahedron) = essay, cube = source (a book on the shelf).
+  // Higher subdivision reads as polished, not low-poly.
   let geometry: THREE.BufferGeometry;
   if (n.type === "concept") {
     geometry = new THREE.IcosahedronGeometry(base * 1.15, 1);
   } else if (n.type === "writing") {
     geometry = new THREE.OctahedronGeometry(base * 1.4, 0);
+  } else if (n.type === "source") {
+    geometry = new THREE.BoxGeometry(base * 1.5, base * 1.5, base * 1.5);
   } else {
     geometry = new THREE.SphereGeometry(base * 0.95, 32, 32);
   }

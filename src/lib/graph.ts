@@ -11,7 +11,9 @@ export interface GraphNode {
   isOrphan: boolean;
   color: string;
   slug: string;
-  type: "concept" | "idea" | "writing";
+  // Sources (books/podcasts/articles) are synthetic hub nodes derived from the
+  // ideas' `source:` frontmatter — they have no page of their own.
+  type: "concept" | "idea" | "writing" | "source";
   // Published essays link out to the blog instead of an internal page.
   url?: string;
 }
@@ -51,11 +53,13 @@ export const TAG_COLORS: Record<string, string> = {
 export const CONCEPT_COLOR = "#8b6914"; // gold — synthesized concepts
 export const IDEA_COLOR = "#a09080"; // tan — atomic ideas
 export const WRITING_COLOR = "#b5603f"; // clay — published essays (diamonds/octahedra)
+export const SOURCE_COLOR = "#4e6a8a"; // ink blue — books/podcasts (squares/cubes)
 export const SEARCH_HIT_COLOR = "#c49a2e"; // golden highlight for search matches
 
 export function getNodeColor(node: GraphNode): string {
-  // Essays read as one category regardless of tags.
+  // Essays and sources each read as one category regardless of tags.
   if (node.type === "writing") return WRITING_COLOR;
+  if (node.type === "source") return SOURCE_COLOR;
   if (node.color) return node.color;
   for (const tag of node.tags) {
     const normalized = tag.toLowerCase().replace(/\s+/g, "");
@@ -120,6 +124,23 @@ export function filterGraph(data: GraphData, query: string): FilteredGraph {
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+}
+
+// "[[The Obstacle Is the Way - Holiday]]" -> "The Obstacle Is the Way - Holiday".
+// Tolerates path prefixes, aliases, and heading/block fragments.
+function wikilinkTarget(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  const match = raw.match(/\[\[([^\]|#]+)/);
+  if (!match) return "";
+  return (match[1].split("/").pop() || match[1]).trim();
+}
+
+// Vault source files are named "{Title} - {Author}"; drop the trailing author
+// segment for display. Titles containing " - " survive (only the last segment
+// goes), and files without the suffix pass through unchanged.
+function sourceDisplayTitle(filename: string): string {
+  const cut = filename.lastIndexOf(" - ");
+  return cut > 0 ? filename.slice(0, cut).trim() : filename;
 }
 
 // Plain-text excerpt for hover/detail cards: strip heading lines (idea files
@@ -224,6 +245,33 @@ export async function buildGraphData(): Promise<GraphData> {
     });
 
     fileIndex.set(filename.toLowerCase(), id);
+
+    // Every idea's `source:` frontmatter names the book/podcast it came from.
+    // Materialize that file as a synthetic hub node (once per source) and
+    // register it in the file index — the wikilink pass below then turns the
+    // frontmatter link of every idea into an idea→source edge for free. The
+    // `![[...#^ref]]` body embeds don't collide: their lookup keys carry the
+    // block fragment, so they never resolve to the plain filename.
+    const sourceFile = wikilinkTarget(frontmatter.source);
+    if (sourceFile && !fileIndex.has(sourceFile.toLowerCase())) {
+      const sourceType =
+        typeof frontmatter.source_type === "string" && frontmatter.source_type
+          ? frontmatter.source_type
+          : "source";
+      nodes.push({
+        id: `source:${slugify(sourceFile)}`,
+        title: sourceDisplayTitle(sourceFile),
+        tags: [sourceType],
+        excerpt: "", // filled in after link counts are known
+        folder: "Sources",
+        linkCount: 0,
+        isOrphan: true,
+        color: "",
+        slug: slugify(sourceFile),
+        type: "source",
+      });
+      fileIndex.set(sourceFile.toLowerCase(), `source:${slugify(sourceFile)}`);
+    }
   }
 
   // Published essays — the output side of the loop. They cite concepts via
@@ -299,6 +347,11 @@ export async function buildGraphData(): Promise<GraphData> {
   for (const node of nodes) {
     node.linkCount = linkCountMap.get(node.id) || 0;
     node.isOrphan = node.linkCount === 0;
+    if (node.type === "source") {
+      node.excerpt = `${node.tags[0] ?? "source"} · ${node.linkCount} extracted idea${
+        node.linkCount === 1 ? "" : "s"
+      } in the graph`;
+    }
   }
 
   const orphanCount = nodes.filter((n) => n.isOrphan).length;
