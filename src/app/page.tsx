@@ -20,7 +20,9 @@ export default async function Home() {
   }
 
   const essaysCount = graphData.nodes.filter((n) => n.type === "writing").length;
-  const reviewedCount = graphData.nodes.length - essaysCount;
+  // Sources are synthetic hubs derived from idea frontmatter, not reviewed notes.
+  const sourcesCount = graphData.nodes.filter((n) => n.type === "source").length;
+  const reviewedCount = graphData.nodes.length - essaysCount - sourcesCount;
   const totalLinks = graphData.stats.totalLinks;
 
   return (
