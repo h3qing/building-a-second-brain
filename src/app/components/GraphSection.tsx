@@ -10,6 +10,7 @@ import {
   CONCEPT_COLOR,
   IDEA_COLOR,
   WRITING_COLOR,
+  SOURCE_COLOR,
   getNodeColor,
   type GraphData,
   type GraphNode,
@@ -305,6 +306,13 @@ export default function GraphSection({ data }: { data: GraphData }) {
             <span className="text-foreground">essay</span>
             <span className="text-muted">published</span>
           </span>
+          <span className="flex items-center gap-2">
+            <span className="w-3 flex items-center justify-center">
+              <span style={{ width: 9, height: 9, background: SOURCE_COLOR }} />
+            </span>
+            <span className="text-foreground">source</span>
+            <span className="text-muted">book · podcast</span>
+          </span>
         </div>
       </div>
 
@@ -374,14 +382,17 @@ export default function GraphSection({ data }: { data: GraphData }) {
               {selectedNode.excerpt}
             </p>
           )}
-          <button
-            type="button"
-            onClick={() => drillIn(selectedNode)}
-            className="text-sm font-medium hover:underline"
-            style={{ color: getNodeColor(selectedNode) }}
-          >
-            {drillInLabel(selectedNode)}
-          </button>
+          {/* Sources are synthetic hubs with no page of their own — no drill-in. */}
+          {selectedNode.type !== "source" && (
+            <button
+              type="button"
+              onClick={() => drillIn(selectedNode)}
+              className="text-sm font-medium hover:underline"
+              style={{ color: getNodeColor(selectedNode) }}
+            >
+              {drillInLabel(selectedNode)}
+            </button>
+          )}
         </div>
       )}
     </div>
