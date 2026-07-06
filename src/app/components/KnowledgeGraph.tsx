@@ -46,9 +46,14 @@ export default function KnowledgeGraph({
 }: KnowledgeGraphProps) {
   const fgRef = useRef<any>(null);
 
-  // Reset view: smoothly re-fit the whole graph.
+  // Reset view: smoothly re-fit the whole graph. The prev-signal guard keeps
+  // a remount (2D/3D toggle) from replaying the last reset against unsettled
+  // node positions.
+  const prevFitSignalRef = useRef(fitSignal);
   useEffect(() => {
-    if (fitSignal > 0) fgRef.current?.zoomToFit?.(600, 60);
+    if (fitSignal === prevFitSignalRef.current) return;
+    prevFitSignalRef.current = fitSignal;
+    fgRef.current?.zoomToFit?.(600, 60);
   }, [fitSignal]);
 
   useEffect(() => {
@@ -217,6 +222,10 @@ export default function KnowledgeGraph({
         height: dimensions.height,
         cursor: hoveredNode ? "pointer" : "grab",
       }}
+      // Clear the hover state when the pointer leaves the canvas — force-graph
+      // only reports hover-off while the pointer stays inside it. Routed
+      // through handleNodeHover so the body cursor resets too.
+      onPointerLeave={() => handleNodeHover(null)}
     >
       <ForceGraph2D
         ref={fgRef}

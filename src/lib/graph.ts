@@ -122,6 +122,24 @@ function slugify(name: string): string {
   return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
+// Plain-text excerpt for hover/detail cards: strip heading lines (idea files
+// start sections with "## Insight" etc.), blockquote markers, link syntax,
+// inline markdown marks, and collapse whitespace.
+function makeExcerpt(content: string, maxLen: number): string {
+  return content
+    // Defensive: parseFrontmatter's malformed-YAML fallback can leave the
+    // frontmatter block in place. Anchored so body `---` dividers survive.
+    .replace(/^---\n[\s\S]*?\n---\n?/, "")
+    .replace(/^#{1,6}\s.*$/gm, "")
+    .replace(/^>\s?/gm, "")
+    .replace(/!?\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, t, a) => a || t)
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[*_`]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLen);
+}
+
 export async function buildGraphData(): Promise<GraphData> {
   // List files (uses tree API — 1 call)
   const [conceptPaths, ideaPaths, writingPaths] = await Promise.all([
@@ -155,11 +173,7 @@ export async function buildGraphData(): Promise<GraphData> {
       tagCounts[tag] = (tagCounts[tag] || 0) + 1;
     }
 
-    const excerpt = content
-      .replace(/^#.+$/m, "")
-      .replace(/---[\s\S]*?---/, "")
-      .trim()
-      .slice(0, 120);
+    const excerpt = makeExcerpt(content, 120);
 
     nodes.push({
       id,
@@ -194,10 +208,7 @@ export async function buildGraphData(): Promise<GraphData> {
       tagCounts[tag] = (tagCounts[tag] || 0) + 1;
     }
 
-    const excerpt = content
-      .replace(/^#.+$/m, "")
-      .trim()
-      .slice(0, 120);
+    const excerpt = makeExcerpt(content, 120);
 
     nodes.push({
       id,
@@ -239,11 +250,7 @@ export async function buildGraphData(): Promise<GraphData> {
       tagCounts[tag] = (tagCounts[tag] || 0) + 1;
     }
 
-    const excerpt = content
-      .replace(/^#.+$/m, "")
-      .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, t, a) => a || t)
-      .trim()
-      .slice(0, 140);
+    const excerpt = makeExcerpt(content, 140);
 
     nodes.push({
       id,

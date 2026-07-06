@@ -45,9 +45,18 @@ export default function GraphSection({ data }: { data: GraphData }) {
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
   const [fitSignal, setFitSignal] = useState(0);
 
+  // Debounce the query before filtering: every filteredData change re-heats the
+  // force simulation, so filtering per keystroke would shuffle the layout while
+  // the user types.
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
   const filteredData = useMemo(
-    () => filterGraph(data, searchQuery),
-    [data, searchQuery]
+    () => filterGraph(data, debouncedQuery),
+    [data, debouncedQuery]
   );
 
   // The selected node + its immediate neighbors. When set, the renderers hide
@@ -166,7 +175,8 @@ export default function GraphSection({ data }: { data: GraphData }) {
       <div className="absolute top-3 left-3 z-10">
         <input
           type="text"
-          placeholder="Search concepts..."
+          placeholder="Search notes..."
+          aria-label="Search the knowledge graph"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="px-3 py-1.5 text-sm bg-background/90 border border-border rounded-md backdrop-blur-sm focus:outline-none focus:border-accent"
@@ -243,7 +253,7 @@ export default function GraphSection({ data }: { data: GraphData }) {
         >
           <KnowledgeGraph3D
             data={filteredData}
-            searchQuery={searchQuery}
+            searchQuery={debouncedQuery}
             dimensions={dimensions}
             focusIds={focusIds}
             fitSignal={fitSignal}
@@ -255,7 +265,7 @@ export default function GraphSection({ data }: { data: GraphData }) {
       ) : (
         <KnowledgeGraph
           data={filteredData}
-          searchQuery={searchQuery}
+          searchQuery={debouncedQuery}
           dimensions={dimensions}
           hoveredNode={hoveredNode}
           focusIds={focusIds}
