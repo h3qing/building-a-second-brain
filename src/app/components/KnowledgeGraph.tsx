@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import {
   getNodeColor,
@@ -33,6 +33,16 @@ interface KnowledgeGraphProps {
   onBackgroundClick: () => void;
 }
 
+// How many labels are visible at a given zoom. Zoomed out, only the top hubs
+// are named; zooming in reveals progressively more, and only past ~3.2x does
+// every node get a label. Keeps the default view readable instead of a text wall.
+function labelBudget(scale: number): number {
+  if (scale < 1.35) return 0;
+  if (scale < 2.2) return 18;
+  if (scale < 3.2) return 60;
+  return Infinity;
+}
+
 export default function KnowledgeGraph({
   data,
   searchQuery,
@@ -45,6 +55,29 @@ export default function KnowledgeGraph({
   onBackgroundClick,
 }: KnowledgeGraphProps) {
   const fgRef = useRef<any>(null);
+
+  // Label priority: sources and essays anchor the map, then by connectivity.
+  // Rank is static per dataset, so it's computed once, not per frame.
+  const labelRank = useMemo(() => {
+    const anchor = (n: GraphNode) =>
+      n.type === "source" || n.type === "writing" ? 1000 : 0;
+    const ranked = [...data.nodes].sort(
+      (a, b) =>
+        anchor(b) + b.linkCount - (anchor(a) + a.linkCount) ||
+        a.id.localeCompare(b.id)
+    );
+    const rank = new Map<string, number>();
+    ranked.forEach((n, i) => rank.set(n.id, i));
+    return rank;
+  }, [data.nodes]);
+
+  // measureText is surprisingly expensive at ~280 nodes × 60fps, and label
+  // widths only depend on the (static) title. Measure once at a 10px reference
+  // size and scale linearly with the actual font size.
+  const labelWidthCache = useRef(new Map<string, number>());
+  useEffect(() => {
+    labelWidthCache.current.clear();
+  }, [data.nodes]);
 
   // Reset view: smoothly re-fit the whole graph. The prev-signal guard keeps
   // a remount (2D/3D toggle) from replaying the last reset against unsettled
@@ -146,15 +179,15 @@ export default function KnowledgeGraph({
       ctx.strokeStyle = isHovered ? color : "rgba(180, 168, 148, 0.3)";
       ctx.stroke();
 
-      // Keep the default view clean: labels on hover/search always, essays and
-      // sources on a gentle zoom-in (they anchor the map), other nodes only
-      // when zoomed further.
+      // Labels on hover/search/focus always; otherwise ranked reveal — the
+      // most-connected hubs (sources, essays, big concepts) get named first,
+      // and zooming in raises the budget. All-at-once labeling past one zoom
+      // threshold was both a text wall and a per-frame measureText storm.
       const shouldRenderLabel =
         !!focusIds || // in focus mode every visible node is labeled
         isHovered ||
         isSearchHit ||
-        globalScale > 2.2 ||
-        ((isWriting || isSource) && globalScale > 1.35);
+        (labelRank.get(graphNode.id) ?? Infinity) < labelBudget(globalScale);
       if (!shouldRenderLabel) return;
 
       const rawLabel =
@@ -164,11 +197,17 @@ export default function KnowledgeGraph({
       const fontSize = Math.max(11 / globalScale, 5.5);
       const y = (node.y || 0) + nodeSize + 4 / globalScale;
 
+      let refWidth = labelWidthCache.current.get(graphNode.id);
+      if (refWidth === undefined) {
+        ctx.font = `600 10px "Crimson Pro", Georgia, serif`;
+        refWidth = ctx.measureText(rawLabel).width;
+        labelWidthCache.current.set(graphNode.id, refWidth);
+      }
+      const textWidth = (refWidth * fontSize) / 10;
+
       ctx.font = `600 ${fontSize}px "Crimson Pro", Georgia, serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-
-      const textWidth = ctx.measureText(rawLabel).width;
       const hPad = 5 / globalScale;
       const vPad = 3 / globalScale;
       ctx.fillStyle = "rgba(26, 24, 18, 0.85)";
@@ -182,7 +221,7 @@ export default function KnowledgeGraph({
       ctx.fillStyle = "rgba(250, 248, 245, 0.95)";
       ctx.fillText(rawLabel, node.x || 0, y);
     },
-    [hoveredNode, searchQuery, focusIds]
+    [hoveredNode, searchQuery, focusIds, labelRank]
   );
 
   const linkCanvasObject = useCallback(

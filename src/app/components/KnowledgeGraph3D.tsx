@@ -153,7 +153,7 @@ export default function KnowledgeGraph3D({
   // Label visibility: in focus mode show exactly the focused nodes' labels;
   // otherwise fade labels in as the camera approaches (nearest MAX_REVEALED_LABELS
   // only, so the view never becomes a text wall), and always show hubs.
-  const updateLabels = useCallback(() => {
+  const updateLabelsNow = useCallback(() => {
     const fg = fgRef.current;
     if (!fg) return;
     const cam = fg.camera?.();
@@ -193,6 +193,38 @@ export default function KnowledgeGraph3D({
     });
   }, []);
 
+  // The full pass above (scene.traverse + world-position math + sort) is too
+  // heavy to run on every controls-change event, which fires once per frame
+  // while rotating or zooming — that's where the interaction lag came from.
+  // Trailing throttle at ~10Hz: cheap during motion, and the trailing call
+  // still settles labels on the final camera pose.
+  const labelThrottleRef = useRef<{
+    last: number;
+    timer: ReturnType<typeof setTimeout> | null;
+  }>({ last: 0, timer: null });
+  const updateLabels = useCallback(() => {
+    const t = labelThrottleRef.current;
+    const wait = 100 - (performance.now() - t.last);
+    if (wait <= 0) {
+      t.last = performance.now();
+      updateLabelsNow();
+    } else if (!t.timer) {
+      t.timer = setTimeout(() => {
+        t.timer = null;
+        t.last = performance.now();
+        updateLabelsNow();
+      }, wait);
+    }
+  }, [updateLabelsNow]);
+
+  useEffect(
+    () => () => {
+      const t = labelThrottleRef.current;
+      if (t.timer) clearTimeout(t.timer);
+    },
+    []
+  );
+
   // Once the simulation settles: size the reveal distance to the actual graph
   // extent, clamp zoom so the camera can't get lost, and frame the whole graph
   // (the default camera sits far too deep, leaving the cloud tiny).
@@ -221,8 +253,8 @@ export default function KnowledgeGraph3D({
       didFitRef.current = true;
       fgRef.current?.zoomToFit?.(700);
     }
-    updateLabels();
-  }, [data.nodes, updateLabels]);
+    updateLabelsNow(); // one-shot on settle — no need to throttle
+  }, [data.nodes, updateLabelsNow]);
 
   // Re-evaluate label visibility whenever the camera moves (zoom/rotate/pan).
   useEffect(() => {
@@ -275,8 +307,8 @@ export default function KnowledgeGraph3D({
         }, 850);
       }
     }
-    updateLabels();
-  }, [focusIds, updateLabels]);
+    updateLabelsNow(); // selection feedback must be immediate
+  }, [focusIds, updateLabelsNow]);
 
   useEffect(
     () => () => {
