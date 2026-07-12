@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { reviewAction } from "@/app/review/action";
 
 interface ReviewCardFormProps {
@@ -16,6 +17,9 @@ interface ReviewCardFormProps {
   // Active recall: hide the insight until the user chooses to reveal it, so
   // re-reviews test recall instead of just re-reading the answer.
   recallMode: boolean;
+  // Prev/next card hrefs for arrow-key navigation (null at the queue edges).
+  prevHref: string | null;
+  nextHref: string | null;
 }
 
 export function ReviewCardForm({
@@ -28,14 +32,103 @@ export function ReviewCardForm({
   insightParagraphs,
   isLoggedIn,
   recallMode,
+  prevHref,
+  nextHref,
 }: ReviewCardFormProps) {
+  const router = useRouter();
   const [mode, setMode] = useState<"ai" | "custom">("ai");
   const [customText, setCustomText] = useState("");
   // In recall mode the insight starts hidden; otherwise it's always shown.
   const [revealed, setRevealed] = useState(!recallMode);
 
+  // Keyboard shortcuts drive the existing forms via requestSubmit(), so a
+  // submit here is exactly the same server action as a button click.
+  const easyFormRef = useRef<HTMLFormElement>(null);
+  const mediumFormRef = useRef<HTMLFormElement>(null);
+  const hardFormRef = useRef<HTMLFormElement>(null);
+  const approveFormRef = useRef<HTMLFormElement>(null);
+  const contestFormRef = useRef<HTMLFormElement>(null);
+  // Each rating submit is a real GitHub commit, so once any form submits the
+  // shortcuts disarm until the next card.
+  const submittedRef = useRef(false);
+
+  const ratingFormRefs = {
+    easy: easyFormRef,
+    medium: mediumFormRef,
+    hard: hardFormRef,
+  };
+
+  // Client state survives searchParams-only navigation, so re-arm the
+  // shortcuts whenever the card changes.
+  useEffect(() => {
+    submittedRef.current = false;
+  }, [currentPath]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      // Don't hijack keys while the user is typing (e.g. the insight editor).
+      const active = document.activeElement;
+      if (
+        active instanceof HTMLElement &&
+        (active.tagName === "INPUT" ||
+          active.tagName === "TEXTAREA" ||
+          active.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (!revealed && (e.key === " " || e.key === "Enter")) {
+        e.preventDefault();
+        setRevealed(true);
+        return;
+      }
+
+      if (e.key === "ArrowLeft" && prevHref) {
+        router.push(prevHref);
+        return;
+      }
+      if (e.key === "ArrowRight" && nextHref) {
+        router.push(nextHref);
+        return;
+      }
+
+      // Rating keys arm only after reveal; the flag blocks double-submits.
+      if (!revealed || !isLoggedIn || submittedRef.current) return;
+
+      const submit = (form: HTMLFormElement | null) => form?.requestSubmit();
+
+      if (isReReview) {
+        if (e.key === "1") submit(easyFormRef.current);
+        else if (e.key === "2") submit(mediumFormRef.current);
+        else if (e.key === "3") submit(hardFormRef.current);
+      } else if (e.key === "a" || e.key === "A") {
+        submit(approveFormRef.current);
+      } else if (e.key === "c" || e.key === "C") {
+        submit(contestFormRef.current);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [revealed, isLoggedIn, isReReview, prevHref, nextHref, router]);
+
+  // Set on any submit (click or key) so a follow-up shortcut can't
+  // double-commit.
+  const markSubmitted = () => {
+    submittedRef.current = true;
+  };
+
   const insightChanged = mode === "custom" && customText.trim() !== "";
   const activeInsight = insightChanged ? customText : aiInsight;
+
+  const keyHints = !revealed
+    ? "space reveal · ←→ navigate"
+    : !isLoggedIn
+      ? "←→ navigate"
+      : isReReview
+        ? "1 easy · 2 medium · 3 hard · ←→ navigate"
+        : "a approve · c contest · ←→ navigate";
 
   return (
     <>
@@ -133,7 +226,12 @@ export function ReviewCardForm({
               </p>
               <div className="action-row">
                 {(["easy", "medium", "hard"] as const).map((difficulty) => (
-                  <form key={difficulty} action={reviewAction}>
+                  <form
+                    key={difficulty}
+                    action={reviewAction}
+                    ref={ratingFormRefs[difficulty]}
+                    onSubmit={markSubmitted}
+                  >
                     <input type="hidden" name="path" value={currentPath} />
                     <input type="hidden" name="action" value={difficulty} />
                     <input type="hidden" name="returnTo" value={returnTo} />
@@ -161,7 +259,11 @@ export function ReviewCardForm({
             </>
           ) : (
             <div className="action-row">
-              <form action={reviewAction}>
+              <form
+                action={reviewAction}
+                ref={approveFormRef}
+                onSubmit={markSubmitted}
+              >
                 <input type="hidden" name="path" value={currentPath} />
                 <input type="hidden" name="action" value="approve" />
                 <input type="hidden" name="returnTo" value={returnTo} />
@@ -182,7 +284,11 @@ export function ReviewCardForm({
                 </button>
               </form>
 
-              <form action={reviewAction}>
+              <form
+                action={reviewAction}
+                ref={contestFormRef}
+                onSubmit={markSubmitted}
+              >
                 <input type="hidden" name="path" value={currentPath} />
                 <input type="hidden" name="action" value="contest" />
                 <input type="hidden" name="returnTo" value={returnTo} />
@@ -206,6 +312,9 @@ export function ReviewCardForm({
           )}
         </div>
       )}
+
+      {/* Shortcut legend — CSS hides it on e-ink and touch devices */}
+      <p className="key-hints label">{keyHints}</p>
     </>
   );
 }

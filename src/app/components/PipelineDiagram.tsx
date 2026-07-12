@@ -1,7 +1,7 @@
 const Arrow = () => (
-  <div style={{ display: "flex", justifyContent: "center", padding: "0.25rem 0" }}>
+  <div className="flex justify-center py-1">
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
-      style={{ color: "var(--ink-border)" }}>
+      className="text-border">
       <path d="M8 2v10M4 9l4 4 4-4"
         stroke="currentColor" strokeWidth="1.5"
         strokeLinecap="round" strokeLinejoin="round" />
@@ -10,84 +10,56 @@ const Arrow = () => (
 );
 
 const Tag = ({ children }: { children: string }) => (
-  <span style={{
-    fontFamily: "var(--font-mono)",
-    fontSize: "0.65rem",
-    letterSpacing: "0.05em",
-    textTransform: "uppercase" as const,
-    color: "var(--ink-muted)",
-    padding: "0.15rem 0.4rem",
-    border: "1px solid var(--ink-border)",
-    borderRadius: "3px",
-  }}>
+  <span className="font-mono text-[0.65rem] tracking-[0.05em] uppercase text-muted px-1.5 py-0.5 border border-border rounded">
     {children}
   </span>
 );
 
-export default function PipelineDiagram() {
-  const box = {
-    border: "1px solid var(--ink-border)",
-    borderRadius: "8px",
-    padding: "1rem 1.25rem",
-    background: "var(--ink-paper)",
-  };
+const StepLabel = ({ children, accent = false }: { children: string; accent?: boolean }) => (
+  <div
+    className={`text-center text-[0.7rem] font-mono tracking-[0.05em] -mt-0.5 mb-0.5 ${
+      accent ? "text-accent" : "text-muted"
+    }`}
+  >
+    {children}
+  </div>
+);
 
-  const accentBox = {
-    ...box,
-    borderColor: "var(--ink-accent)",
-    background: "color-mix(in srgb, var(--ink-accent) 4%, var(--ink-paper))",
-  };
+const boxTitle = "font-heading text-base font-medium mb-1.5 tracking-tight";
+const boxDesc = "text-[0.8rem] text-muted italic leading-normal";
+// The accent boxes keep a faint accent wash — no token class exists for the
+// color-mix, so it stays inline.
+const accentWash = {
+  borderColor: "var(--ink-accent)",
+  background: "color-mix(in srgb, var(--ink-accent) 4%, var(--background))",
+};
 
-  const title = {
-    fontFamily: "var(--font-heading), Georgia, serif",
-    fontSize: "1rem",
-    fontWeight: 500 as const,
-    color: "var(--ink-ink)",
-    marginBottom: "0.35rem",
-    letterSpacing: "-0.01em",
-  };
+interface PipelineDiagramProps {
+  // Live vault counts (reviewed ideas, distinct sources, concepts) — the
+  // homepage feeds these from the graph build instead of hardcoded numbers.
+  ideas: number;
+  sources: number;
+  concepts: number;
+}
 
-  const desc = {
-    fontSize: "0.8rem",
-    fontWeight: 400 as const,
-    color: "var(--ink-muted)",
-    fontStyle: "italic" as const,
-    lineHeight: 1.5,
-  };
-
+export default function PipelineDiagram({ ideas, sources, concepts }: PipelineDiagramProps) {
   return (
-    <div style={{
-      margin: "2rem 0",
-      padding: "1.5rem",
-      border: "1px solid var(--ink-border)",
-      borderRadius: "8px",
-      background: "var(--ink-paper)",
-    }}>
-      <div style={{
-        fontFamily: "var(--font-heading), Georgia, serif",
-        fontSize: "1.1rem",
-        fontWeight: 400,
-        color: "var(--ink-muted)",
-        marginBottom: "1.25rem",
-        letterSpacing: "-0.01em",
-      }}>
+    <div className="my-8 p-6 border border-border rounded-lg bg-background">
+      <div className="font-heading text-[1.1rem] text-muted mb-5 tracking-tight">
         How Knowledge Moves
       </div>
 
       {/* Layer 1: Sources */}
-      <div style={box}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <div style={title}>10 Notes/</div>
+      <div className="border border-border rounded-lg px-5 py-4 bg-background">
+        <div className="flex justify-between items-baseline">
+          <div className={boxTitle} style={{ color: "var(--ink-ink)" }}>10 Notes/</div>
           <Tag>immutable</Tag>
         </div>
-        <div style={desc}>
+        <div className={boxDesc}>
           Raw sources. Kindle highlights, articles, podcasts, videos. Never modified after capture.
           This is the ground truth.
         </div>
-        <div style={{
-          display: "flex", flexWrap: "wrap", gap: "0.4rem",
-          marginTop: "0.6rem",
-        }}>
+        <div className="flex flex-wrap gap-1.5 mt-2.5">
           <Tag>kindle notes</Tag>
           <Tag>articles</Tag>
           <Tag>podcasts</Tag>
@@ -97,124 +69,85 @@ export default function PipelineDiagram() {
       </div>
 
       <Arrow />
-      <div style={{ textAlign: "center", fontSize: "0.7rem", color: "var(--ink-muted)", fontFamily: "var(--font-mono)", letterSpacing: "0.05em", margin: "-0.15rem 0 0.1rem" }}>
-        CLAUDE CODE EXTRACTS
-      </div>
+      <StepLabel>CLAUDE CODE EXTRACTS</StepLabel>
       <Arrow />
 
       {/* Layer 2: Ideas */}
-      <div style={box}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <div style={title}>20 Ideas/</div>
+      <div className="border border-border rounded-lg px-5 py-4 bg-background">
+        <div className="flex justify-between items-baseline">
+          <div className={boxTitle} style={{ color: "var(--ink-ink)" }}>20 Ideas/</div>
           <Tag>ai-generated</Tag>
         </div>
-        <div style={desc}>
+        <div className={boxDesc}>
           Atomic ideas extracted per source. Each idea is one insight, one file. Links back to the
           original highlight. This is where AI does the heavy lifting.
         </div>
-        <div style={{
-          display: "flex", flexWrap: "wrap", gap: "0.4rem",
-          marginTop: "0.6rem",
-        }}>
-          <Tag>89 ideas</Tag>
-          <Tag>12 books</Tag>
-          <Tag>unreviewed</Tag>
+        <div className="flex flex-wrap gap-1.5 mt-2.5">
+          <Tag>{`${ideas} reviewed ideas`}</Tag>
+          <Tag>{`${sources} sources`}</Tag>
         </div>
       </div>
 
       <Arrow />
-      <div style={{ textAlign: "center", fontSize: "0.7rem", color: "var(--ink-muted)", fontFamily: "var(--font-mono)", letterSpacing: "0.05em", margin: "-0.15rem 0 0.1rem" }}>
-        SYNTHESIZE ACROSS SOURCES
-      </div>
+      <StepLabel>SYNTHESIZE ACROSS SOURCES</StepLabel>
       <Arrow />
 
       {/* Layer 3: Concepts */}
-      <div style={accentBox}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <div style={{ ...title, color: "var(--ink-accent)" }}>30 Concept/</div>
+      <div className="border rounded-lg px-5 py-4" style={accentWash}>
+        <div className="flex justify-between items-baseline">
+          <div className={`${boxTitle} text-accent`}>30 Concept/</div>
           <Tag>wiki layer</Tag>
         </div>
-        <div style={desc}>
+        <div className={boxDesc}>
           Cross-source concepts. A concept like &ldquo;negotiation&rdquo; pulls insights from books,
           articles, conversations. Wikilinked. This is the knowledge graph.
         </div>
-        <div style={{
-          display: "flex", flexWrap: "wrap", gap: "0.4rem",
-          marginTop: "0.6rem",
-        }}>
-          <Tag>42 concepts</Tag>
+        <div className="flex flex-wrap gap-1.5 mt-2.5">
+          <Tag>{`${concepts} concepts`}</Tag>
           <Tag>cross-referenced</Tag>
         </div>
       </div>
 
       <Arrow />
-      <div style={{ textAlign: "center", fontSize: "0.7rem", color: "var(--ink-accent)", fontFamily: "var(--font-mono)", letterSpacing: "0.05em", margin: "-0.15rem 0 0.1rem" }}>
-        HUMAN REVIEWS ON KINDLE
-      </div>
+      <StepLabel accent>HUMAN REVIEWS ON KINDLE</StepLabel>
       <Arrow />
 
       {/* Layer 4: This App */}
-      <div style={accentBox}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <div style={{ ...title, color: "var(--ink-accent)" }}>second-brain.heqinghuang.com</div>
+      <div className="border rounded-lg px-5 py-4" style={accentWash}>
+        <div className="flex justify-between items-baseline">
+          <div className={`${boxTitle} text-accent`}>second-brain.heqinghuang.com</div>
         </div>
-        <div style={desc}>
+        <div className={boxDesc}>
           AI extracts. Human reviews. Only approved content goes public.
           The graph grows as you read more books and review more ideas.
         </div>
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "0.5rem",
-          marginTop: "0.6rem",
-        }}>
-          <div style={{
-            ...box,
-            padding: "0.6rem 0.75rem",
-            textAlign: "center" as const,
-          }}>
-            <div style={{ fontSize: "0.65rem", fontFamily: "var(--font-mono)", color: "var(--ink-muted)", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>Public</div>
-            <div style={{ fontSize: "0.8rem", color: "var(--ink-text)", marginTop: "0.2rem" }}>Graph + Feed</div>
+        <div className="grid grid-cols-2 gap-2 mt-2.5">
+          <div className="border border-border rounded-lg px-3 py-2.5 bg-background text-center">
+            <div className="text-[0.65rem] font-mono text-muted uppercase tracking-[0.05em]">Public</div>
+            <div className="text-[0.8rem] text-foreground mt-1">Graph + Feed</div>
           </div>
-          <div style={{
-            ...box,
-            padding: "0.6rem 0.75rem",
-            borderColor: "var(--ink-accent)",
-            textAlign: "center" as const,
-          }}>
-            <div style={{ fontSize: "0.65rem", fontFamily: "var(--font-mono)", color: "var(--ink-accent)", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>Private</div>
-            <div style={{ fontSize: "0.8rem", color: "var(--ink-text)", marginTop: "0.2rem" }}>Review Queue</div>
+          <div className="border rounded-lg px-3 py-2.5 bg-background text-center" style={{ borderColor: "var(--ink-accent)" }}>
+            <div className="text-[0.65rem] font-mono text-accent uppercase tracking-[0.05em]">Private</div>
+            <div className="text-[0.8rem] text-foreground mt-1">Review Queue</div>
           </div>
         </div>
       </div>
 
       {/* Meta orchestration note */}
-      <div style={{
-        marginTop: "1.25rem",
-        padding: "0.75rem 1rem",
-        border: "1px dashed var(--ink-border)",
-        borderRadius: "6px",
-        display: "flex",
-        gap: "0.75rem",
-        alignItems: "baseline",
-      }}>
-        <span style={{ ...title, fontSize: "0.85rem", marginBottom: 0, whiteSpace: "nowrap" as const }}>00 Meta/</span>
-        <span style={{ ...desc, fontStyle: "normal" }}>
+      <div className="mt-5 px-4 py-3 border border-dashed border-border rounded-md flex gap-3 items-baseline">
+        <span className={`${boxTitle} text-[0.85rem] whitespace-nowrap`} style={{ color: "var(--ink-ink)", marginBottom: 0 }}>
+          00 Meta/
+        </span>
+        <span className={`${boxDesc} not-italic`}>
           Orchestrates everything. Index of all pages, operation log, schema definition,
           review queue. The system&apos;s memory of itself.
         </span>
       </div>
 
       {/* Caption */}
-      <div style={{
-        marginTop: "1rem",
-        fontSize: "0.75rem",
-        color: "var(--ink-muted)",
-        textAlign: "center" as const,
-        fontStyle: "italic",
-      }}>
+      <div className="mt-4 text-[0.75rem] text-muted text-center italic">
         The graph grows as you review.
-        Fork this project on <a href="https://github.com/h3qing/second-brain" style={{ color: "var(--ink-accent)" }}>GitHub</a>.
+        Fork this project on <a href="https://github.com/h3qing/second-brain" className="text-accent">GitHub</a>.
       </div>
     </div>
   );

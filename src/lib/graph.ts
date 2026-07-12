@@ -1,36 +1,46 @@
 import { listFiles, getFilesContent } from "./github";
 import { parseFrontmatter, extractTitle } from "./parser";
+import { toISODate, todayISO } from "./time";
 
 export interface GraphNode {
   id: string;
   title: string;
   tags: string[];
   excerpt: string;
-  folder: string;
   linkCount: number;
-  isOrphan: boolean;
-  color: string;
   slug: string;
   // Sources (books/podcasts/articles) are synthetic hub nodes derived from the
   // ideas' `source:` frontmatter — they have no page of their own.
   type: "concept" | "idea" | "writing" | "source";
   // Published essays link out to the blog instead of an internal page.
   url?: string;
+  // Ideas only: vault path, so the graph can deep-link into a review session.
+  path?: string;
+  // Spaced repetition: this idea is due for review (same predicate as the
+  // review queue's categorize). Recomputed on each ISR regeneration.
+  dueForReview?: boolean;
 }
 
 export interface GraphLink {
   source: string;
   target: string;
+  // Wikilink multiplicity: repeated links between the same pair collapse into
+  // one edge that renders (and pulls) proportionally heavier.
+  weight: number;
 }
 
 export interface GraphData {
   nodes: GraphNode[];
   links: GraphLink[];
+  // Live vault counts for the homepage — computed before orphans are dropped,
+  // so they describe the whole vault, not just the connected graph. Stays
+  // server-side; only { nodes, links } ship to the client.
   stats: {
-    totalNotes: number;
-    totalLinks: number;
-    orphanCount: number;
-    tagCounts: Record<string, number>;
+    concepts: number;
+    ideas: number;
+    sources: number;
+    essays: number;
+    links: number;
   };
 }
 
@@ -55,12 +65,12 @@ export const IDEA_COLOR = "#a09080"; // tan — atomic ideas
 export const WRITING_COLOR = "#b5603f"; // clay — published essays (diamonds/octahedra)
 export const SOURCE_COLOR = "#4e6a8a"; // ink blue — books/podcasts (squares/cubes)
 export const SEARCH_HIT_COLOR = "#c49a2e"; // golden highlight for search matches
+export const DUE_COLOR = "#d4842a"; // amber — ideas due for review (breathing ring / glow)
 
 export function getNodeColor(node: GraphNode): string {
   // Essays and sources each read as one category regardless of tags.
   if (node.type === "writing") return WRITING_COLOR;
   if (node.type === "source") return SOURCE_COLOR;
-  if (node.color) return node.color;
   for (const tag of node.tags) {
     const normalized = tag.toLowerCase().replace(/\s+/g, "");
     if (TAG_COLORS[normalized]) return TAG_COLORS[normalized];
@@ -80,15 +90,15 @@ export interface FilteredGraph {
 
 // react-force-graph mutates link endpoints from ids into node objects at runtime,
 // so accept either shape.
-function endpointId(end: string | GraphNode): string {
+export function endpointId(end: string | GraphNode): string {
   return typeof end === "string" ? end : end.id;
 }
 
-// Drop orphans, then (when searching) keep title/tag matches plus their 1-hop
-// neighbors, pruning links to those between visible nodes. Pure — returns new
-// arrays, never mutates the input.
-export function filterGraph(data: GraphData, query: string): FilteredGraph {
-  let nodes = data.nodes.filter((n) => !n.isOrphan);
+// When searching, keep title/tag matches plus their 1-hop neighbors, pruning
+// links to those between visible nodes. Orphans are already dropped server-side
+// in buildGraphData. Pure — returns new arrays, never mutates the input.
+export function filterGraph(data: FilteredGraph, query: string): FilteredGraph {
+  let nodes = data.nodes;
   const q = query.trim().toLowerCase();
 
   if (q) {
@@ -173,9 +183,8 @@ export async function buildGraphData(): Promise<GraphData> {
   const allPaths = [...conceptPaths, ...ideaPaths, ...writingPaths];
   const files = await getFilesContent(allPaths, "force-cache");
 
+  const today = todayISO();
   const nodes: GraphNode[] = [];
-  const links: GraphLink[] = [];
-  const tagCounts: Record<string, number> = {};
   const fileIndex = new Map<string, string>(); // filename -> node id
 
   // Single pass: parse content, build nodes, extract links
@@ -190,10 +199,6 @@ export async function buildGraphData(): Promise<GraphData> {
     const slug = slugify(filename);
 
     const tags = Array.isArray(frontmatter.tags) ? frontmatter.tags : [];
-    for (const tag of tags) {
-      tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-    }
-
     const excerpt = makeExcerpt(content, 120);
 
     nodes.push({
@@ -201,10 +206,7 @@ export async function buildGraphData(): Promise<GraphData> {
       title,
       tags,
       excerpt,
-      folder: "Concepts",
       linkCount: 0,
-      isOrphan: true,
-      color: "",
       slug,
       type: "concept",
     });
@@ -225,23 +227,25 @@ export async function buildGraphData(): Promise<GraphData> {
     const slug = slugify(filename);
 
     const tags = Array.isArray(frontmatter.tags) ? frontmatter.tags : [];
-    for (const tag of tags) {
-      tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-    }
-
     const excerpt = makeExcerpt(content, 120);
+
+    // Same due predicate as the review queue's categorize(): due once its next
+    // visit date arrives, unless it was already reviewed today.
+    const nextReview = toISODate(frontmatter.next_review_date);
+    const reviewedDate = toISODate(frontmatter.reviewed_date);
+    const dueForReview =
+      !!nextReview && nextReview <= today && reviewedDate !== today;
 
     nodes.push({
       id,
       title,
       tags,
       excerpt,
-      folder: "Ideas",
       linkCount: 0,
-      isOrphan: true,
-      color: "",
       slug,
       type: "idea",
+      path,
+      dueForReview,
     });
 
     fileIndex.set(filename.toLowerCase(), id);
@@ -263,10 +267,7 @@ export async function buildGraphData(): Promise<GraphData> {
         title: sourceDisplayTitle(sourceFile),
         tags: [sourceType],
         excerpt: "", // filled in after link counts are known
-        folder: "Sources",
         linkCount: 0,
-        isOrphan: true,
-        color: "",
         slug: slugify(sourceFile),
         type: "source",
       });
@@ -294,10 +295,6 @@ export async function buildGraphData(): Promise<GraphData> {
     const id = `writing:${slug}`;
 
     const tags = Array.isArray(frontmatter.tags) ? frontmatter.tags : [];
-    for (const tag of tags) {
-      tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-    }
-
     const excerpt = makeExcerpt(content, 140);
 
     nodes.push({
@@ -305,10 +302,7 @@ export async function buildGraphData(): Promise<GraphData> {
       title,
       tags,
       excerpt,
-      folder: "Writing",
       linkCount: 0,
-      isOrphan: true,
-      color: "",
       slug,
       type: "writing",
       url,
@@ -317,7 +311,11 @@ export async function buildGraphData(): Promise<GraphData> {
     fileIndex.set(filename.toLowerCase(), id);
   }
 
-  // Extract wikilinks from already-fetched content (no re-fetching)
+  // Extract wikilinks from already-fetched content (no re-fetching). Repeated
+  // wikilinks between the same pair collapse into one direction-normalized
+  // weighted edge — duplicates would double the d3 link force and stack
+  // overdraw alpha on what looks like a single line.
+  const linkWeights = new Map<string, number>();
   for (const path of allPaths) {
     const file = files.get(path);
     if (!file) continue;
@@ -332,38 +330,55 @@ export async function buildGraphData(): Promise<GraphData> {
       const linkTarget = match[1].split("/").pop() || match[1];
       const targetId = fileIndex.get(linkTarget.toLowerCase());
       if (targetId && targetId !== sourceId) {
-        links.push({ source: sourceId, target: targetId });
+        const key =
+          sourceId < targetId
+            ? `${sourceId} ${targetId}`
+            : `${targetId} ${sourceId}`;
+        linkWeights.set(key, (linkWeights.get(key) || 0) + 1);
       }
     }
   }
 
-  // Update link counts and orphan status
+  const links: GraphLink[] = [...linkWeights.entries()].map(([key, weight]) => {
+    const [source, target] = key.split(" ");
+    return { source, target, weight };
+  });
+
+  // Degree = distinct connected pairs, not wikilink multiplicity.
   const linkCountMap = new Map<string, number>();
   for (const link of links) {
     linkCountMap.set(link.source, (linkCountMap.get(link.source) || 0) + 1);
     linkCountMap.set(link.target, (linkCountMap.get(link.target) || 0) + 1);
   }
 
-  for (const node of nodes) {
-    node.linkCount = linkCountMap.get(node.id) || 0;
-    node.isOrphan = node.linkCount === 0;
+  const withCounts = nodes.map((node) => {
+    const linkCount = linkCountMap.get(node.id) || 0;
     if (node.type === "source") {
-      node.excerpt = `${node.tags[0] ?? "source"} · ${node.linkCount} extracted idea${
-        node.linkCount === 1 ? "" : "s"
-      } in the graph`;
+      return {
+        ...node,
+        linkCount,
+        excerpt: `${node.tags[0] ?? "source"} · ${linkCount} extracted idea${
+          linkCount === 1 ? "" : "s"
+        } in the graph`,
+      };
     }
-  }
+    return { ...node, linkCount };
+  });
 
-  const orphanCount = nodes.filter((n) => n.isOrphan).length;
+  // Vault-wide counts for the homepage, taken before orphans drop out.
+  const stats = {
+    concepts: withCounts.filter((n) => n.type === "concept").length,
+    ideas: withCounts.filter((n) => n.type === "idea").length,
+    sources: withCounts.filter((n) => n.type === "source").length,
+    essays: withCounts.filter((n) => n.type === "writing").length,
+    links: links.length,
+  };
 
+  // Orphans never render (the client used to filter them per-request) — drop
+  // them here so they don't ship in the RSC payload at all.
   return {
-    nodes,
+    nodes: withCounts.filter((n) => n.linkCount > 0),
     links,
-    stats: {
-      totalNotes: nodes.length,
-      totalLinks: links.length,
-      orphanCount,
-      tagCounts,
-    },
+    stats,
   };
 }

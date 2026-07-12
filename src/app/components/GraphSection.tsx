@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import KnowledgeGraph from "./KnowledgeGraph";
@@ -11,8 +12,9 @@ import {
   IDEA_COLOR,
   WRITING_COLOR,
   SOURCE_COLOR,
+  DUE_COLOR,
   getNodeColor,
-  type GraphData,
+  type FilteredGraph,
   type GraphNode,
 } from "@/lib/graph";
 
@@ -34,7 +36,7 @@ function getFullscreenElement(): Element | null {
   return doc.fullscreenElement ?? doc.webkitFullscreenElement ?? null;
 }
 
-export default function GraphSection({ data }: { data: GraphData }) {
+export default function GraphSection({ data }: { data: FilteredGraph }) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -58,6 +60,12 @@ export default function GraphSection({ data }: { data: GraphData }) {
   const filteredData = useMemo(
     () => filterGraph(data, debouncedQuery),
     [data, debouncedQuery]
+  );
+
+  // Spaced-repetition bridge: how many ideas on the map are due today.
+  const dueCount = useMemo(
+    () => data.nodes.filter((n) => n.dueForReview).length,
+    [data.nodes]
   );
 
   // The selected node + its immediate neighbors. When set, the renderers hide
@@ -89,7 +97,9 @@ export default function GraphSection({ data }: { data: GraphData }) {
       setDimensions({ width: window.innerWidth, height: window.innerHeight });
     } else {
       const { width } = el.getBoundingClientRect();
-      setDimensions({ width, height: Math.min(500, width * 0.65) });
+      // Taller now that the graph is the homepage centerpiece; the floor keeps
+      // it usable on narrow phones.
+      setDimensions({ width, height: Math.max(340, Math.min(620, width * 0.6)) });
     }
   }, []);
 
@@ -270,6 +280,7 @@ export default function GraphSection({ data }: { data: GraphData }) {
           dimensions={dimensions}
           hoveredNode={hoveredNode}
           focusIds={focusIds}
+          selectedId={selectedNode?.id ?? null}
           fitSignal={fitSignal}
           onNodeHover={setHoveredNode}
           onNodeClick={handleNodeClick}
@@ -277,17 +288,25 @@ export default function GraphSection({ data }: { data: GraphData }) {
         />
       )}
 
-      {/* Stats + legend */}
+      {/* Stats + due chip + legend */}
       <div className="absolute bottom-3 right-3 z-10 flex flex-col items-end gap-1.5">
+        {dueCount > 0 && (
+          <Link
+            href="/review"
+            className="text-xs font-medium bg-background/90 border rounded-full px-3 py-1 backdrop-blur-sm transition-colors hover:bg-background"
+            style={{ color: DUE_COLOR, borderColor: DUE_COLOR }}
+          >
+            {dueCount} due for review →
+          </Link>
+        )}
         <div className="text-xs text-muted bg-background/90 border border-border rounded-full px-3 py-1 backdrop-blur-sm">
           {filteredData.nodes.length} nodes · {filteredData.links.length} links
         </div>
         <div className="flex flex-col gap-1 text-xs bg-background/90 border border-border rounded-lg px-3 py-2 backdrop-blur-sm">
           <span className="flex items-center gap-2">
             <span className="w-3 flex items-center justify-center">
-              <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
-                <polygon points="6,0.5 10.8,3.25 10.8,8.75 6,11.5 1.2,8.75 1.2,3.25" fill={CONCEPT_COLOR} />
-              </svg>
+              {/* Circle, matching what the canvas actually draws for concepts. */}
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: CONCEPT_COLOR }} />
             </span>
             <span className="text-foreground">concept</span>
             <span className="text-muted">synthesized</span>
@@ -313,6 +332,22 @@ export default function GraphSection({ data }: { data: GraphData }) {
             <span className="text-foreground">source</span>
             <span className="text-muted">book · podcast</span>
           </span>
+          {dueCount > 0 && (
+            <span className="flex items-center gap-2">
+              <span className="w-3 flex items-center justify-center">
+                <span
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    border: `2px solid ${DUE_COLOR}`,
+                  }}
+                />
+              </span>
+              <span className="text-foreground">glowing</span>
+              <span className="text-muted">due for review</span>
+            </span>
+          )}
         </div>
       </div>
 
@@ -383,16 +418,31 @@ export default function GraphSection({ data }: { data: GraphData }) {
             </p>
           )}
           {/* Sources are synthetic hubs with no page of their own — no drill-in. */}
-          {selectedNode.type !== "source" && (
-            <button
-              type="button"
-              onClick={() => drillIn(selectedNode)}
-              className="text-sm font-medium hover:underline"
-              style={{ color: getNodeColor(selectedNode) }}
-            >
-              {drillInLabel(selectedNode)}
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {selectedNode.type !== "source" && (
+              <button
+                type="button"
+                onClick={() => drillIn(selectedNode)}
+                className="text-sm font-medium hover:underline"
+                style={{ color: getNodeColor(selectedNode) }}
+              >
+                {drillInLabel(selectedNode)}
+              </button>
+            )}
+            {/* Ideas jump straight into a recall session on their card. */}
+            {selectedNode.type === "idea" && selectedNode.path && (
+              <Link
+                href={`/review/card?${new URLSearchParams({
+                  path: selectedNode.path,
+                  mode: "rereview",
+                })}`}
+                className="text-sm font-medium hover:underline"
+                style={{ color: DUE_COLOR }}
+              >
+                {selectedNode.dueForReview ? "Due — review now ↻" : "Review now ↻"}
+              </Link>
+            )}
+          </div>
         </div>
       )}
     </div>
