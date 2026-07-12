@@ -3,13 +3,17 @@
 // This module is only ever loaded client-side (the parent imports it via
 // next/dynamic with ssr:false), so a static import of the WebGL graph + three
 // is safe and keeps the heavy 3D bundle out of the initial page load.
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph3D from "react-force-graph-3d";
 import * as THREE from "three";
 import SpriteText from "three-spritetext";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import {
   getNodeColor,
   getNodeSize,
+  DUE_COLOR,
   SEARCH_HIT_COLOR,
   type FilteredGraph,
   type GraphNode,
@@ -40,12 +44,23 @@ const MAX_REVEALED_LABELS = 24;
 // Hub labels anchor the zoomed-out map, so they render larger than the rest.
 const LABEL_HEIGHT = 5;
 const HUB_LABEL_HEIGHT = 8.5;
-// How far the camera sits from a node when you click to focus it.
-const FOCUS_CAMERA_DISTANCE = 150;
 
-function makeNodeMesh(n: GraphNode, hit: boolean): THREE.Mesh {
+// Emissive/bloom tuning per theme. In dark mode a low threshold lets every
+// node glow softly (the cinematic look); in light mode the parchment background
+// sits near full luminance, so the threshold parks at 1.0 and only deliberately
+// overdriven emissives (due / search hits) push past it and halo.
+function themeParams(isDark: boolean) {
+  // Tuned against the ~300-node overview: with the whole cloud in frame the
+  // emissives stack, so resting glow stays low and the threshold high enough
+  // that only due/search/hover nodes actually bloom.
+  return isDark
+    ? { bloomStrength: 0.32, bloomThreshold: 0.7, bloomRadius: 0.2, rest: 0.12, due: 0.5, hit: 1.1, hoverBoost: 0.6 }
+    : { bloomStrength: 0.4, bloomThreshold: 1.0, bloomRadius: 0.2, rest: 0.1, due: 1.2, hit: 1.25, hoverBoost: 0.35 };
+}
+
+function makeNodeMesh(n: GraphNode): THREE.Mesh {
   const base = getNodeSize(n);
-  const color = hit ? SEARCH_HIT_COLOR : getNodeColor(n);
+  const color = getNodeColor(n);
   // Distinct silhouette per type: rounded gem = concept, smooth orb = idea,
   // crisp diamond (octahedron) = essay, cube = source (a book on the shelf).
   // Higher subdivision reads as polished, not low-poly.
@@ -59,37 +74,47 @@ function makeNodeMesh(n: GraphNode, hit: boolean): THREE.Mesh {
   } else {
     geometry = new THREE.SphereGeometry(base * 0.95, 32, 32);
   }
-  // Physical material with a soft clearcoat sheen + faint inner glow — a sleek,
-  // modern finish rather than a flat/neon look.
+  // Physical material with a soft clearcoat sheen + faint inner glow — the
+  // scene environment map (set up once below) gives the clearcoat something
+  // to reflect. Search/due/theme states are applied by mutation afterwards,
+  // so the mesh itself is created exactly once per node per dataset.
   const material = new THREE.MeshPhysicalMaterial({
     color,
     emissive: new THREE.Color(color),
-    emissiveIntensity: hit ? 0.5 : 0.2,
+    emissiveIntensity: 0.2,
     roughness: 0.3,
     metalness: 0.0,
     clearcoat: 0.8,
     clearcoatRoughness: 0.35,
   });
-  return new THREE.Mesh(geometry, material);
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.userData.nodeId = n.id;
+  mesh.userData.restingIntensity = 0.2;
+  return mesh;
 }
 
-function makeLabel(n: GraphNode, isHub: boolean): SpriteText {
+function makeLabel(n: GraphNode): SpriteText {
   const text = n.title.length > 30 ? `${n.title.slice(0, 30)}…` : n.title;
   const label = new SpriteText(text);
   label.color = "rgba(250, 248, 245, 0.96)";
   label.backgroundColor = "rgba(26, 24, 18, 0.82)";
   label.padding = 2;
   label.borderRadius = 3;
-  label.textHeight = isHub ? HUB_LABEL_HEIGHT : LABEL_HEIGHT;
+  label.textHeight = LABEL_HEIGHT; // hubs get resized dynamically in updateLabels
   label.position.set(0, getNodeSize(n) * 1.6 + 3, 0);
   label.material.transparent = true;
   label.material.opacity = 0;
   label.visible = false; // revealed by distance / focus, see updateLabels()
   label.userData.isNodeLabel = true;
   label.userData.nodeId = n.id;
-  label.userData.isHub = isHub;
   label.renderOrder = 10;
   return label;
+}
+
+// Read a CSS custom property off the document root (theme-resolved).
+function cssVar(name: string, fallback: string): string {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
 }
 
 export default function KnowledgeGraph3D({
@@ -112,7 +137,31 @@ export default function KnowledgeGraph3D({
     pos: { x: number; y: number; z: number };
     target: { x: number; y: number; z: number };
   } | null>(null);
+  // Every node's mesh, keyed by id — search/due/hover/theme changes mutate
+  // materials here instead of rebuilding the whole scene.
+  const meshMapRef = useRef(new Map<string, THREE.Mesh>());
+  const hoveredMeshRef = useRef<THREE.Mesh | null>(null);
+  const bloomRef = useRef<UnrealBloomPass | null>(null);
   const query = searchQuery.trim().toLowerCase();
+
+  // This component only mounts client-side (dynamic ssr:false), so matchMedia
+  // is available from the first render.
+  const [isDark, setIsDark] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = (e: MediaQueryListEvent) => setIsDark(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  // Bloom needs an opaque canvas — match the surrounding card surface.
+  const [bgColor, setBgColor] = useState("#171717");
+  useEffect(() => {
+    setBgColor(cssVar("--card", isDark ? "#171717" : "#fafafa"));
+  }, [isDark]);
 
   const isSearchHit = useCallback(
     (node: GraphNode) => !!query && node.title.toLowerCase().includes(query),
@@ -129,6 +178,10 @@ export default function KnowledgeGraph3D({
     );
     return new Set(ranked.slice(0, HUB_COUNT).map((n) => n.id));
   }, [data.nodes]);
+  const hubIdsRef = useRef(hubIds);
+  useEffect(() => {
+    hubIdsRef.current = hubIds;
+  }, [hubIds]);
 
   // Auto-fit once per dataset. The engine restarts (and re-stops) on unrelated
   // prop changes like container resizes — without this guard every re-stop
@@ -138,22 +191,191 @@ export default function KnowledgeGraph3D({
     didFitRef.current = false;
   }, [data]);
 
-  // Every node is a custom group: a type-specific mesh plus its label.
-  const nodeThreeObject = useCallback(
-    (node: any) => {
-      const n = node as GraphNode;
-      const group = new THREE.Group();
-      group.add(makeNodeMesh(n, isSearchHit(n)));
-      group.add(makeLabel(n, hubIds.has(n.id)));
-      return group;
+  // Frame the bulk of the graph, not its outliers — a lone far-flung island
+  // would otherwise dictate the camera distance and shrink the core cloud.
+  const makeFitFilter = useCallback(() => {
+    const pts = data.nodes.filter((n) =>
+      Number.isFinite((n as any).x)
+    ) as Array<GraphNode & { x: number; y: number; z: number }>;
+    if (pts.length === 0) return () => true;
+    const cx = pts.reduce((s, n) => s + n.x, 0) / pts.length;
+    const cy = pts.reduce((s, n) => s + n.y, 0) / pts.length;
+    const cz = pts.reduce((s, n) => s + (n.z ?? 0), 0) / pts.length;
+    const rms = Math.sqrt(
+      pts.reduce(
+        (s, n) =>
+          s + (n.x - cx) ** 2 + (n.y - cy) ** 2 + ((n.z ?? 0) - cz) ** 2,
+        0
+      ) / pts.length
+    );
+    const maxD = Math.max(rms * 2.5, 200);
+    return (n: any) =>
+      Number.isFinite(n.x) &&
+      Math.hypot(n.x - cx, n.y - cy, (n.z ?? 0) - cz) <= maxD;
+  }, [data.nodes]);
+
+  // Stable identity: force-graph only rebuilds node objects when this callback
+  // changes, so keeping it dependency-free means a search keystroke (or theme
+  // flip) mutates existing materials instead of recreating ~300 meshes.
+  const nodeThreeObject = useCallback((node: any) => {
+    const n = node as GraphNode;
+    const old = meshMapRef.current.get(n.id);
+    if (old) {
+      old.geometry.dispose();
+      (old.material as THREE.Material).dispose();
+    }
+    const group = new THREE.Group();
+    const mesh = makeNodeMesh(n);
+    meshMapRef.current.set(n.id, mesh);
+    group.add(mesh);
+    group.add(makeLabel(n));
+    return group;
+  }, []);
+
+  // Apply search-hit / due-for-review / theme state by mutating materials.
+  useEffect(() => {
+    const p = themeParams(isDark);
+    for (const n of data.nodes) {
+      const mesh = meshMapRef.current.get(n.id);
+      if (!mesh) continue;
+      const material = mesh.material as THREE.MeshPhysicalMaterial;
+      const hit = isSearchHit(n);
+      const baseColor = hit ? SEARCH_HIT_COLOR : getNodeColor(n);
+      material.color.set(baseColor);
+      // Due ideas glow amber so the bloom pass halos them in the cloud.
+      const emissiveColor = hit
+        ? SEARCH_HIT_COLOR
+        : n.dueForReview
+          ? DUE_COLOR
+          : baseColor;
+      const intensity = hit ? p.hit : n.dueForReview ? p.due : p.rest;
+      material.emissive.set(emissiveColor);
+      material.emissiveIntensity = intensity;
+      mesh.userData.restingIntensity = intensity;
+    }
+  }, [data.nodes, isSearchHit, isDark]);
+
+  // Dispose meshes for nodes that left the dataset (search filtering), and
+  // everything on unmount — force-graph drops the objects from the scene but
+  // never frees GPU resources for custom node objects.
+  useEffect(() => {
+    const ids = new Set(data.nodes.map((n) => n.id));
+    for (const [id, mesh] of meshMapRef.current) {
+      if (ids.has(id)) continue;
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+      meshMapRef.current.delete(id);
+    }
+  }, [data.nodes]);
+  useEffect(
+    () => () => {
+      for (const [, mesh] of meshMapRef.current) {
+        mesh.geometry.dispose();
+        (mesh.material as THREE.Material).dispose();
+      }
+      meshMapRef.current.clear();
     },
-    [isSearchHit, hubIds]
+    []
   );
+
+  // One-time scene dressing, as soon as the graph instance exists: bloom pass
+  // on the built-in composer, and a RoomEnvironment map so the clearcoat
+  // materials have something to reflect.
+  useEffect(() => {
+    // Polls on setTimeout, NOT requestAnimationFrame — rAF freezes in hidden
+    // tabs, and a background-loaded page would never get its scene dressed.
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let bloom: UnrealBloomPass | null = null;
+    let output: OutputPass | null = null;
+    let envTexture: THREE.Texture | null = null;
+    let scene: THREE.Scene | null = null;
+    let fgInstance: any = null;
+    const setup = () => {
+      const fg = fgRef.current;
+      if (!fg) {
+        timer = setTimeout(setup, 50);
+        return;
+      }
+      fgInstance = fg;
+      const p = themeParams(
+        window.matchMedia("(prefers-color-scheme: dark)").matches
+      );
+      bloom = new UnrealBloomPass(
+        new THREE.Vector2(dimensions.width, dimensions.height),
+        p.bloomStrength,
+        p.bloomRadius,
+        p.bloomThreshold
+      );
+      fg.postProcessingComposer().addPass(bloom);
+      // The composer renders in linear space; without a final OutputPass the
+      // frame reaches the screen un-encoded and the dark background washes
+      // out to gray.
+      output = new OutputPass();
+      fg.postProcessingComposer().addPass(output);
+      bloomRef.current = bloom;
+
+      const pmrem = new THREE.PMREMGenerator(fg.renderer());
+      envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      pmrem.dispose();
+      scene = fg.scene();
+      if (scene) {
+        scene.environment = envTexture;
+        // Opaque background via scene.background, NOT the backgroundColor
+        // prop: the prop goes through renderer.setClearColor, which skips the
+        // sRGB→linear conversion and comes out of the OutputPass washed-out
+        // gray. THREE.Color converts properly.
+        scene.background = new THREE.Color(
+          cssVar(
+            "--card",
+            window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "#171717"
+              : "#fafafa"
+          )
+        );
+      }
+    };
+    setup();
+    return () => {
+      if (timer) clearTimeout(timer);
+      if (scene) {
+        scene.environment = null;
+        scene.background = null;
+      }
+      envTexture?.dispose();
+      const composer = fgInstance?.postProcessingComposer?.();
+      if (output) {
+        composer?.removePass?.(output);
+        output.dispose();
+      }
+      if (bloom) {
+        composer?.removePass?.(bloom);
+        bloom.dispose();
+      }
+      bloomRef.current = null;
+    };
+    // dimensions are intentionally omitted: the composer propagates resizes to
+    // its passes, so the bloom pass only needs its initial size.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Theme flips retune bloom, background, and depth fog in place.
+  useEffect(() => {
+    const p = themeParams(isDark);
+    const bloom = bloomRef.current;
+    if (bloom) {
+      bloom.strength = p.bloomStrength;
+      bloom.threshold = p.bloomThreshold;
+      bloom.radius = p.bloomRadius;
+    }
+    const scene = fgRef.current?.scene?.();
+    if (scene?.background instanceof THREE.Color) scene.background.set(bgColor);
+    if (scene?.fog) (scene.fog as THREE.FogExp2).color.set(bgColor);
+  }, [isDark, bgColor]);
 
   // Label visibility: in focus mode show exactly the focused nodes' labels;
   // otherwise fade labels in as the camera approaches (nearest MAX_REVEALED_LABELS
   // only, so the view never becomes a text wall), and always show hubs.
-  const updateLabels = useCallback(() => {
+  const updateLabelsNow = useCallback(() => {
     const fg = fgRef.current;
     if (!fg) return;
     const cam = fg.camera?.();
@@ -172,7 +394,12 @@ export default function KnowledgeGraph3D({
         obj.material.opacity = on ? 1 : 0;
         return;
       }
-      if (obj.userData.isHub) {
+      // Hub status tracks the current (filtered) dataset via the ref, so
+      // reused sprites stay correct without any rebuild.
+      const isHub = hubIdsRef.current.has(obj.userData.nodeId);
+      const desiredHeight = isHub ? HUB_LABEL_HEIGHT : LABEL_HEIGHT;
+      if (obj.textHeight !== desiredHeight) obj.textHeight = desiredHeight;
+      if (isHub) {
         obj.material.opacity = 1; // hubs anchor the map — always legible
         obj.visible = true;
         return;
@@ -193,9 +420,42 @@ export default function KnowledgeGraph3D({
     });
   }, []);
 
+  // The full pass above (scene.traverse + world-position math + sort) is too
+  // heavy to run on every controls-change event, which fires once per frame
+  // while rotating or zooming — that's where the interaction lag came from.
+  // Trailing throttle at ~10Hz: cheap during motion, and the trailing call
+  // still settles labels on the final camera pose.
+  const labelThrottleRef = useRef<{
+    last: number;
+    timer: ReturnType<typeof setTimeout> | null;
+  }>({ last: 0, timer: null });
+  const updateLabels = useCallback(() => {
+    const t = labelThrottleRef.current;
+    const wait = 100 - (performance.now() - t.last);
+    if (wait <= 0) {
+      t.last = performance.now();
+      updateLabelsNow();
+    } else if (!t.timer) {
+      t.timer = setTimeout(() => {
+        t.timer = null;
+        t.last = performance.now();
+        updateLabelsNow();
+      }, wait);
+    }
+  }, [updateLabelsNow]);
+
+  useEffect(
+    () => () => {
+      const t = labelThrottleRef.current;
+      if (t.timer) clearTimeout(t.timer);
+    },
+    []
+  );
+
   // Once the simulation settles: size the reveal distance to the actual graph
-  // extent, clamp zoom so the camera can't get lost, and frame the whole graph
-  // (the default camera sits far too deep, leaving the cloud tiny).
+  // extent, clamp zoom so the camera can't get lost, tune the depth fog, and
+  // frame the whole graph (the default camera sits far too deep, leaving the
+  // cloud tiny).
   const handleEngineStop = useCallback(() => {
     let radius = 0;
     for (const n of data.nodes as Array<GraphNode & { x?: number; y?: number; z?: number }>) {
@@ -215,14 +475,40 @@ export default function KnowledgeGraph3D({
         cam ? cam.position.length() : 0
       );
     }
+    // Gentle exponential fog scaled to the cloud: distant nodes recede into
+    // the background color instead of ending at a hard silhouette.
+    const scene = fgRef.current?.scene?.();
+    if (scene) {
+      const density = 1 / (radiusRef.current * 5.5);
+      if (scene.fog instanceof THREE.FogExp2) {
+        scene.fog.density = density;
+        scene.fog.color.set(bgColor);
+      } else {
+        scene.fog = new THREE.FogExp2(bgColor, density);
+      }
+    }
     // Skip the fit while a node is focused OR a focus fly-in just started
     // (savedCamRef is set synchronously on click, before focusIds updates).
     if (!focusRef.current && !savedCamRef.current && !didFitRef.current) {
       didFitRef.current = true;
-      fgRef.current?.zoomToFit?.(700);
+      const before = fgRef.current?.camera?.()?.position.length() ?? 0;
+      fgRef.current?.zoomToFit?.(700, 40, makeFitFilter());
+      // A fit fired mid-init can silently no-op. If the camera hasn't moved
+      // once the tween should have finished, fire it once more.
+      setTimeout(() => {
+        const cam = fgRef.current?.camera?.();
+        if (
+          cam &&
+          Math.abs(cam.position.length() - before) < 1 &&
+          !focusRef.current &&
+          !savedCamRef.current
+        ) {
+          fgRef.current?.zoomToFit?.(700, 40, makeFitFilter());
+        }
+      }, 900);
     }
-    updateLabels();
-  }, [data.nodes, updateLabels]);
+    updateLabelsNow(); // one-shot on settle — no need to throttle
+  }, [data.nodes, bgColor, updateLabelsNow, makeFitFilter]);
 
   // Re-evaluate label visibility whenever the camera moves (zoom/rotate/pan).
   useEffect(() => {
@@ -241,11 +527,12 @@ export default function KnowledgeGraph3D({
     if (fitSignal === prevFitSignalRef.current) return; // ignore remounts
     prevFitSignalRef.current = fitSignal;
     savedCamRef.current = null; // a full re-fit supersedes any saved pose
-    fgRef.current?.zoomToFit?.(800);
-  }, [fitSignal]);
+    fgRef.current?.zoomToFit?.(800, 40, makeFitFilter());
+  }, [fitSignal, makeFitFilter]);
 
-  // When the focus set changes, re-apply label visibility immediately. On
-  // deselect, fly the camera back to where it was before the focus fly-in.
+  // When the focus set changes, frame the neighborhood and re-apply label
+  // visibility. On deselect, fly the camera back to where it was before the
+  // focus fly-in.
   const restoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     focusRef.current = focusIds;
@@ -256,13 +543,17 @@ export default function KnowledgeGraph3D({
         clearTimeout(restoreTimerRef.current);
         restoreTimerRef.current = null;
       }
+      // Frame the whole neighborhood. Unlike the old origin-relative fly-in,
+      // zoomToFit can't strand the camera inside a node that sits far from
+      // (or at) the origin.
+      fgRef.current?.zoomToFit?.(900, 80, (n: any) => focusIds.has(n.id));
     } else if (savedCamRef.current) {
       if (!didFitRef.current) {
         // The user clicked before the first auto-fit ever ran, so the saved
         // pose is the useless far-out default — fit the graph instead.
         savedCamRef.current = null;
         didFitRef.current = true;
-        fgRef.current?.zoomToFit?.(800);
+        fgRef.current?.zoomToFit?.(800, 40, makeFitFilter());
       } else {
         const { pos, target } = savedCamRef.current;
         fgRef.current?.cameraPosition(pos, target, 800);
@@ -275,8 +566,8 @@ export default function KnowledgeGraph3D({
         }, 850);
       }
     }
-    updateLabels();
-  }, [focusIds, updateLabels]);
+    updateLabelsNow(); // selection feedback must be immediate
+  }, [focusIds, updateLabelsNow, makeFitFilter]);
 
   useEffect(
     () => () => {
@@ -303,43 +594,51 @@ export default function KnowledgeGraph3D({
     [focusIds]
   );
 
+  // Hover parity with 2D: the pointed-at node swells and brightens.
   const handleHover = useCallback(
     (node: any) => {
+      const prev = hoveredMeshRef.current;
+      if (prev) {
+        prev.scale.setScalar(1);
+        const m = prev.material as THREE.MeshPhysicalMaterial;
+        m.emissiveIntensity = prev.userData.restingIntensity ?? 0.2;
+        hoveredMeshRef.current = null;
+      }
+      if (node) {
+        const mesh = meshMapRef.current.get((node as GraphNode).id);
+        if (mesh) {
+          mesh.scale.setScalar(1.2);
+          const m = mesh.material as THREE.MeshPhysicalMaterial;
+          m.emissiveIntensity =
+            (mesh.userData.restingIntensity ?? 0.2) +
+            themeParams(isDark).hoverBoost;
+          hoveredMeshRef.current = mesh;
+        }
+      }
       onNodeHover((node as GraphNode | null) || null);
       document.body.style.cursor = node ? "pointer" : "default";
     },
-    [onNodeHover]
+    [onNodeHover, isDark]
   );
 
-  // Clicking a node flies the camera in to frame it, then selects it. The
-  // pre-flight pose is saved (once per focus session) so deselect can restore it.
+  // Clicking a node saves the overview pose (once per focus session) so
+  // deselect can restore it; the actual fly-in happens in the focusIds effect,
+  // which frames the whole neighborhood.
   const handleClick = useCallback(
     (node: any) => {
       const fg = fgRef.current;
-      if (fg && node) {
+      if (fg && node && !focusRef.current && !savedCamRef.current) {
         // Save the pose only when entering focus from a settled overview —
         // if savedCamRef is still set, a restore tween is in flight and the
         // current camera position is transient, not the real overview.
-        if (!focusRef.current && !savedCamRef.current) {
-          const cam = fg.camera?.();
-          const target = fg.controls?.()?.target;
-          if (cam && target) {
-            savedCamRef.current = {
-              pos: { x: cam.position.x, y: cam.position.y, z: cam.position.z },
-              target: { x: target.x, y: target.y, z: target.z },
-            };
-          }
+        const cam = fg.camera?.();
+        const target = fg.controls?.()?.target;
+        if (cam && target) {
+          savedCamRef.current = {
+            pos: { x: cam.position.x, y: cam.position.y, z: cam.position.z },
+            target: { x: target.x, y: target.y, z: target.z },
+          };
         }
-        const x = node.x ?? 0;
-        const y = node.y ?? 0;
-        const z = node.z ?? 0;
-        const dist = Math.hypot(x, y, z) || 1;
-        const ratio = 1 + FOCUS_CAMERA_DISTANCE / dist;
-        fg.cameraPosition(
-          { x: x * ratio, y: y * ratio, z: z * ratio },
-          { x, y, z },
-          900
-        );
       }
       onNodeClick(node as GraphNode);
     },
@@ -368,7 +667,7 @@ export default function KnowledgeGraph3D({
         d3AlphaMin={0.02}
         onEngineStop={handleEngineStop}
         linkColor={() => "rgba(180, 168, 148, 0.35)"}
-        linkWidth={0.5}
+        linkWidth={(link: any) => 0.5 + Math.min((link.weight ?? 1) - 1, 3) * 0.3}
         linkOpacity={0.4}
         linkVisibility={linkVisibility}
         onNodeHover={handleHover}
@@ -376,6 +675,9 @@ export default function KnowledgeGraph3D({
         onBackgroundClick={onBackgroundClick}
         enableNodeDrag={false}
         showNavInfo={false}
+        // Transparent clear color; the real background is scene.background
+        // (see the scene-dressing effect), which color-manages correctly
+        // through the postprocessing chain.
         backgroundColor="rgba(0,0,0,0)"
       />
     </div>

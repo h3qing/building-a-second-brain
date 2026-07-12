@@ -179,6 +179,8 @@ export default async function CardReview({
         insightParagraphs={insightParagraphs}
         isLoggedIn={isLoggedIn}
         recallMode={recallMode}
+        prevHref={prevPath ? cardHref(prevPath, navMode, done) : null}
+        nextHref={nextPath ? cardHref(nextPath, navMode, done) : null}
       />
 
       {/* Source Context */}

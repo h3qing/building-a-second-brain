@@ -19,11 +19,8 @@ export default async function Home() {
     throw new Error("Knowledge graph data unavailable (GitHub fetch returned no nodes)");
   }
 
-  const essaysCount = graphData.nodes.filter((n) => n.type === "writing").length;
-  // Sources are synthetic hubs derived from idea frontmatter, not reviewed notes.
-  const sourcesCount = graphData.nodes.filter((n) => n.type === "source").length;
-  const reviewedCount = graphData.nodes.length - essaysCount - sourcesCount;
-  const totalLinks = graphData.stats.totalLinks;
+  const { stats } = graphData;
+  const reviewedCount = stats.concepts + stats.ideas;
 
   return (
     <div className="space-y-8">
@@ -71,10 +68,7 @@ export default async function Home() {
 
       {/* Header */}
       <div>
-        <h1
-          className="font-heading tracking-tight"
-          style={{ fontSize: "2.2rem", fontWeight: 300, letterSpacing: "-0.01em" }}
-        >
+        <h1 className="font-heading display-title tracking-tight">
           Heqing&apos;s Knowledge Base
         </h1>
         <p className="text-muted mt-2" style={{ fontSize: "1.05rem", lineHeight: 1.7 }}>
@@ -83,43 +77,41 @@ export default async function Home() {
         </p>
       </div>
 
-      {/* How It Works — prominent, right after intro */}
-      <PipelineDiagram />
-
-      {/* Stats — only show when there's something to show */}
-      {(reviewedCount > 0 || totalLinks > 0) && (
-        <div className="flex gap-8 text-sm border-t border-b border-border py-4">
-          <div>
-            <span className="text-2xl font-heading text-accent">
-              {reviewedCount}
-            </span>
-            <span className="text-muted ml-1.5">reviewed</span>
-          </div>
-          <div>
-            <span className="text-2xl font-heading text-accent">
-              {totalLinks}
-            </span>
-            <span className="text-muted ml-1.5">connections</span>
-          </div>
-          {essaysCount > 0 && (
-            <div>
-              <span className="text-2xl font-heading text-accent">
-                {essaysCount}
-              </span>
-              <span className="text-muted ml-1.5">essays</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Knowledge Graph — the centerpiece: concepts, ideas, and the essays
-          that draw on them, all in one map */}
-      {graphData.nodes.length > 0 && (
-        <div>
+      {/* Knowledge Graph — the centerpiece leads, full-bleed past the column */}
+      <div className="rq-breakout">
+        <div className="rq-inner">
           <p className="label mb-3">Knowledge Graph</p>
-          <GraphSection data={graphData} />
+          <GraphSection data={{ nodes: graphData.nodes, links: graphData.links }} />
+          {/* Status band — the vault's vitals in one strip under the map */}
+          <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm border-b border-border py-4">
+            <div>
+              <span className="text-2xl font-heading text-accent">{reviewedCount}</span>
+              <span className="text-muted ml-1.5">reviewed notes</span>
+            </div>
+            <div>
+              <span className="text-2xl font-heading text-accent">{stats.links}</span>
+              <span className="text-muted ml-1.5">connections</span>
+            </div>
+            <div>
+              <span className="text-2xl font-heading text-accent">{stats.sources}</span>
+              <span className="text-muted ml-1.5">sources</span>
+            </div>
+            {stats.essays > 0 && (
+              <div>
+                <span className="text-2xl font-heading text-accent">{stats.essays}</span>
+                <span className="text-muted ml-1.5">essays</span>
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      </div>
+
+      {/* How It Works — after the map has made its case */}
+      <PipelineDiagram
+        ideas={stats.ideas}
+        sources={stats.sources}
+        concepts={stats.concepts}
+      />
 
       {/* Pipeline Feed */}
       {feedEntries.length > 0 && (

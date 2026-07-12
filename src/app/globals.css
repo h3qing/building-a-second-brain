@@ -66,6 +66,14 @@ body {
   font-family: var(--font-heading), "Cormorant Garamond", Georgia, serif;
 }
 
+/* Homepage display heading — scales down gracefully on phones */
+.display-title {
+  font-size: clamp(2.1rem, 5vw, 2.8rem);
+  font-weight: 300;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
 /* Section labels — monospace uppercase */
 .label {
   font-size: 0.68rem;
@@ -595,5 +603,19 @@ a {
     border-radius: 0;
     border-bottom: 1px solid var(--ink-border);
     padding: 0.75rem 0;
+  }
+}
+
+/* Keyboard shortcut hints (review card) — one-line mono legend under the
+   actions. Hidden on e-ink (monochrome) and touch (coarse pointer) devices,
+   where there is no physical keyboard to hint at. */
+.key-hints {
+  display: block;
+  text-align: center;
+}
+
+@media (monochrome), (pointer: coarse) {
+  .key-hints {
+    display: none;
   }
 }
