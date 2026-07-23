@@ -21,4 +21,4 @@ Sort richest-first. For books, `highlights` ≈ how much raw material there is t
 
 | Source | Type | Date | Ideas |
 |--------|------|------|-------|
-| | | | |
+| [[10 Notes/Conversations/梁文锋投资者交流会 - 梁文锋\|梁文锋投资者交流会 · 录音文字稿]] | conversation | 2026-07-23 | 12 |
