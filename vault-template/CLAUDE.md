@@ -112,6 +112,7 @@ The **first 1-2 tags** are top-level Topic labels — capitalized, single word, 
 - **Leadership** — management, teams, hiring, culture
 - **Philosophy** — ethics, meaning, mental models
 - **Health** — fitness, sleep, nutrition, longevity
+- **AI** — models, compute, technical roadmaps, AI industry
 
 Example: `tags: [Psychology, Productivity, habit-formation, attention]` — Psychology and Productivity are Topic labels, the rest are descriptors.
 
