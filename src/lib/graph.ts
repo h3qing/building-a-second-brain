@@ -179,9 +179,12 @@ export async function buildGraphData(): Promise<GraphData> {
     listFiles("40 Write/49 Publish", "force-cache"),
   ]);
 
-  // Fetch all content in parallel
+  // Fetch all content in parallel (content-addressed: unchanged blobs come
+  // from the cache, so only edited files cost an API call). Unreviewed ideas
+  // can't be skipped pre-download — the review gate below reads frontmatter,
+  // which lives inside the blob, not in the tree listing.
   const allPaths = [...conceptPaths, ...ideaPaths, ...writingPaths];
-  const files = await getFilesContent(allPaths, "force-cache");
+  const files = await getFilesContent(allPaths);
 
   const today = todayISO();
   const nodes: GraphNode[] = [];

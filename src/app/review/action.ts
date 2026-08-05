@@ -1,8 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { updateTag } from "next/cache";
 import { verifySession } from "@/lib/auth";
-import { getFileContent, updateFile } from "@/lib/github";
+import { getFileContent, updateFile, TREE_TAG } from "@/lib/github";
 import {
   updateReviewStatus,
   updateSpacedRepetition,
@@ -82,6 +83,10 @@ export async function reviewAction(formData: FormData) {
     if (!file) redirect("/review");
     await updateFile(path, transform(file!.content), file!.sha, message);
   }
+
+  // Expire the tagged repo tree so the next read resolves fresh blob shas
+  // instead of serving the pre-commit tree for up to its revalidate window.
+  updateTag(TREE_TAG);
 
   // Keep the in-memory queue cache in step with the commit so the next card
   // render reflects this review immediately (status, dates, session position).
