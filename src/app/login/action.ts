@@ -25,6 +25,10 @@ export async function loginAction(formData: FormData) {
 
   const valid = await verifyPin(pin);
   if (!valid) {
+    // The in-memory attempt counter resets on every serverless cold start, so
+    // a fixed delay is the floor on brute-force throughput regardless of
+    // which instance serves the request.
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     recordAttempt(ip);
     const afterAttempt = checkRateLimit(ip);
     if (!afterAttempt.allowed) {

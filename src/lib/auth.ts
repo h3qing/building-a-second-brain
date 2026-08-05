@@ -66,13 +66,19 @@ export async function verifyPin(pin: string): Promise<boolean> {
 
 // Session token — HMAC with embedded expiry (fast, runs on every authenticated request)
 function signToken(expiresAt: number): string {
-  const pinHash = process.env.AUTH_PIN_HASH || "";
+  const pinHash = process.env.AUTH_PIN_HASH;
+  if (!pinHash) {
+    // Never sign with a guessable key: an empty-string HMAC key would let
+    // anyone mint valid sessions if the env var is dropped in a deployment.
+    throw new Error("AUTH_PIN_HASH is not configured");
+  }
   const payload = `${expiresAt}:secondbrain-session-v2`;
   const signature = createHmac("sha256", pinHash).update(payload).digest("hex");
   return `${expiresAt}:${signature}`;
 }
 
 function verifyToken(token: string): boolean {
+  if (!process.env.AUTH_PIN_HASH) return false;
   const colonIdx = token.indexOf(":");
   if (colonIdx === -1) return false;
 
