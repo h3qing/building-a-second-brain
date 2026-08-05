@@ -1,4 +1,4 @@
-import { listFiles, getFileContent, getFilesContent } from "./github";
+import { listFiles, getFileViaTree } from "./github";
 import { parseFrontmatter, extractTitle } from "./parser";
 import { remark } from "remark";
 import remarkGfm from "remark-gfm";
@@ -127,7 +127,7 @@ export async function findConceptBySlug(slug: string): Promise<{
   // Direct lookup: find entry matching slug in concepts
   for (const entry of fileIndex.values()) {
     if (entry.slug === slug && entry.path.startsWith("30 Concept/")) {
-      const file = await getFileContent(entry.path, "force-cache");
+      const file = await getFileViaTree(entry.path);
       if (!file) return null;
 
       const { frontmatter, content } = parseFrontmatter(file.content);
@@ -153,7 +153,7 @@ export async function findIdeaBySlug(slug: string): Promise<{
 
   for (const entry of fileIndex.values()) {
     if (entry.slug === slug && entry.path.startsWith("20 Ideas/")) {
-      const file = await getFileContent(entry.path, "force-cache");
+      const file = await getFileViaTree(entry.path);
       if (!file) return null;
 
       const { frontmatter, content } = parseFrontmatter(file.content);
@@ -178,7 +178,7 @@ export async function parsePipelineFeed(): Promise<
     tags: string[];
   }>
 > {
-  const file = await getFileContent("00 Meta/log.md", "force-cache");
+  const file = await getFileViaTree("00 Meta/log.md");
   if (!file) return [];
 
   const entries: Array<{ date: string; text: string; tags: string[] }> = [];

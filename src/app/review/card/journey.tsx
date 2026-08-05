@@ -1,4 +1,4 @@
-import { getFileContent, listCommits } from "@/lib/github";
+import { getFileViaTree, listCommits } from "@/lib/github";
 import { parseFrontmatter } from "@/lib/parser";
 import { parseReviewEvents } from "@/lib/review-stats";
 import {
@@ -54,7 +54,7 @@ export async function IdeaJourney({
   const [commits, sourceFile] = await Promise.all([
     listCommits().catch(() => []),
     sourceLink.startsWith("10 Notes/")
-      ? getFileContent(sourceLink.endsWith(".md") ? sourceLink : `${sourceLink}.md`).catch(() => null)
+      ? getFileViaTree(sourceLink.endsWith(".md") ? sourceLink : `${sourceLink}.md`).catch(() => null)
       : Promise.resolve(null),
   ]);
 

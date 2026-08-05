@@ -38,7 +38,7 @@ function cleanSourceName(raw: string): string {
 // the idea notes that wikilink to it.
 async function buildConceptSources(): Promise<Map<string, TensionSource[]>> {
   const ideaPaths = await listFiles("20 Ideas");
-  const files = await getFilesContent(ideaPaths, "force-cache");
+  const files = await getFilesContent(ideaPaths);
 
   const byConcept = new Map<string, Map<string, TensionSource>>();
 
@@ -93,7 +93,7 @@ export async function getTensions(): Promise<Tension[]> {
     listFiles("30 Concept"),
     buildConceptSources(),
   ]);
-  const files = await getFilesContent(paths, "force-cache");
+  const files = await getFilesContent(paths);
 
   const out: Tension[] = [];
   for (const path of paths) {

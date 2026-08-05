@@ -43,7 +43,12 @@ interface ReviewPatch {
   at: number;
 }
 const recentReviews = new Map<string, ReviewPatch>();
-const PATCH_TTL = 120_000; // 2 min — covers GitHub read-after-write propagation
+// Reads are now tree-sha -> blob: a write purges the tree cache, but if the
+// refetch still catches a pre-commit tree (GitHub read-after-write lag), that
+// stale tree can be pinned for the full 15-min tree revalidate window. Keep
+// patches long enough to outlast it; overlayRecentReviews drops each patch the
+// moment the fetched data catches up, so the long TTL never masks real edits.
+const PATCH_TTL = 960_000; // 16 min — tree revalidate window + margin
 
 function overlayRecentReviews(items: QueueItem[]): void {
   const now = Date.now();

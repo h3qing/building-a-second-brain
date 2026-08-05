@@ -1,5 +1,5 @@
 import matter from "gray-matter";
-import { getFileContent } from "./github";
+import { getFileViaTree } from "./github";
 
 export interface SourceContext {
   quote: string;
@@ -133,7 +133,7 @@ export async function resolveHighlights(
 
     let sourceContent = sourceCache.get(sourcePath);
     if (sourceContent === undefined) {
-      const file = await getFileContent(sourcePath);
+      const file = await getFileViaTree(sourcePath);
       sourceContent = file?.content || "";
       sourceCache.set(sourcePath, sourceContent);
     }
