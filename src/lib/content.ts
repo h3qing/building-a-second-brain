@@ -1,8 +1,29 @@
 import { listFiles, getFileContent, getFilesContent } from "./github";
 import { parseFrontmatter, extractTitle } from "./parser";
 import { remark } from "remark";
-import remarkHtml from "remark-html";
 import remarkGfm from "remark-gfm";
+import remarkRehype from "remark-rehype";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
+import rehypeStringify from "rehype-stringify";
+import { defaultSchema, type Schema } from "hast-util-sanitize";
+
+// Vault notes contain third-party text captured verbatim by the ingest
+// pipeline, so rendered HTML must be sanitized. The schema only extends the
+// GitHub default with the class our wikilink pass emits on anchors — added to
+// the schema's existing className rule, since only the first rule per
+// attribute is applied.
+const sanitizeSchema: Schema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    a: (defaultSchema.attributes?.a ?? []).map((attr) =>
+      Array.isArray(attr) && attr[0] === "className"
+        ? ([...attr, "wikilink"] as typeof attr)
+        : attr
+    ),
+  },
+};
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
@@ -80,7 +101,16 @@ export async function renderMarkdown(
   fileIndex: Map<string, FileEntry>
 ): Promise<string> {
   const withLinks = resolveWikilinks(stripLeadingH1(content), fileIndex);
-  const result = await remark().use(remarkGfm).use(remarkHtml, { sanitize: false }).process(withLinks);
+  // Raw HTML (the injected wikilink anchors, plus anything captured from the
+  // web) is parsed into real elements first, then sanitized — so legitimate
+  // anchors survive while scripts/handlers/foreign embeds are stripped.
+  const result = await remark()
+    .use(remarkGfm)
+    .use(remarkRehype, { allowDangerousHtml: true })
+    .use(rehypeRaw)
+    .use(rehypeSanitize, sanitizeSchema)
+    .use(rehypeStringify)
+    .process(withLinks);
   return result.toString();
 }
 

@@ -22,11 +22,22 @@ export default async function CardReview({
   }>;
 }) {
   const isLoggedIn = await verifySession();
+  // The card view fetches and renders raw vault files (including their full
+  // source text), so it is only available to the authenticated owner.
+  if (!isLoggedIn) redirect("/login");
 
   const params = await searchParams;
   const currentPath = params.path;
 
   if (!currentPath) redirect("/review");
+  // Cards only ever live under the ideas/concepts folders; reject anything
+  // else so this page can't be used to read arbitrary vault files.
+  if (
+    !/^(20 Ideas|30 Concept)\/.+\.md$/.test(currentPath) ||
+    currentPath.includes("..")
+  ) {
+    redirect("/review");
+  }
 
   const file = await getFileContent(currentPath);
   if (!file) redirect("/review");
