@@ -26,6 +26,10 @@ Operations: `ingest`, `query`, `lint`, `review`, `restructure`
 - Files: 20 Ideas/Books/*.md, 30 Concept/{habits,identity,systems}.md
 -->
 
+## [2026-08-06] ingest | 硅谷101：与月之暗面投资人叶奇意聊Kimi前史与中国AI十年接力
+- Ingested Apple Podcasts 单集链接（id 1000779348807，视频版 2026-07-28 发布）；网络策略屏蔽了 RSS/Apple/YouTube，正文为二手文字稿（钛媒体/搜狐/网易转载）整理的内容纪要并已标注；extracted 8 atomic ideas, created 2 new concepts（人才迁徙、投资判断）, bumped 6 existing concepts to source_count 2
+- Files: 10 Notes/Podcasts/中国开源模型摸到SOTA了 与月之暗面投资人聊Kimi前史 - 硅谷101.md, 20 Ideas/Podcasts/*.md (8), 30 Concept/{人才迁徙,投资判断}.md, 30 Concept/{AGI,研究文化,算力,克制,愿景,开源}.md (updated)
+
 ## [2026-07-23] ingest | 梁文锋投资者交流会 · 录音文字稿
 - Ingested user-uploaded PDF（42 页录音文字稿，录音 2026-05-20，约 3 小时 44 分钟）; full transcript preserved as source, extracted 12 atomic ideas, created 8 new concepts; extended Topic Vocabulary with `AI`
 - Files: 10 Notes/Conversations/梁文锋投资者交流会 - 梁文锋.md, 20 Ideas/Conversations/*.md (12), 30 Concept/{克制,愿景,开源,合理利润,持续学习,AGI,算力,研究文化}.md
