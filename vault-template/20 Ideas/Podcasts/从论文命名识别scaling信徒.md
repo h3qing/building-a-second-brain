@@ -14,7 +14,7 @@ tags: [AI, Strategy, ye-qiyi, yang-zhilin, talent-spotting, scaling-law]
 
 ## Insight
 
-ChatGPT 发布前，叶奇意靠追论文脉络而非追热点锁定杨植麟：Transformer-XL 和 XLNet 的“XL”命名暴露了作者对 scaling 的渴望，加上他在 CPM、GLM、盘古等 decoder-only 规模化实践中的参与，构成了识别前沿人才的信号链。这段在“寻找杨植麟”一节，是她投资判断的信息来源方法论。
+识别前沿人才，与其看头衔和热度，不如读他的研究脉络：选题、命名和路线选择会提前多年暴露一个人的野心。叶奇意在 ChatGPT 之前就从 Transformer-XL 与 XLNet 的“XL”里读出杨植麟对 scaling 的渴望，再加上他在 CPM、GLM、盘古等 decoder-only 实践中的参与，锁定了标的。
 
 ## Source Context
 

@@ -26,6 +26,10 @@ Operations: `ingest`, `query`, `lint`, `review`, `restructure`
 - Files: 20 Ideas/Books/*.md, 30 Concept/{habits,identity,systems}.md
 -->
 
+## [2026-08-06] restructure | 打磨硅谷101这期的 8 条 idea 笔记
+- 按用户反馈重写全部 Insight：每条先立可迁移的经久道理，节目具体事件降为例证
+- Files: 20 Ideas/Podcasts/*.md (8, insight sections only)
+
 ## [2026-08-06] ingest | 硅谷101：与月之暗面投资人叶奇意聊Kimi前史与中国AI十年接力
 - Ingested Apple Podcasts 单集链接（id 1000779348807，视频版 2026-07-28 发布）；网络策略屏蔽了 RSS/Apple/YouTube，正文为二手文字稿（钛媒体/搜狐/网易转载）整理的内容纪要并已标注；extracted 8 atomic ideas, created 2 new concepts（人才迁徙、投资判断）, bumped 6 existing concepts to source_count 2
 - Files: 10 Notes/Podcasts/中国开源模型摸到SOTA了 与月之暗面投资人聊Kimi前史 - 硅谷101.md, 20 Ideas/Podcasts/*.md (8), 30 Concept/{人才迁徙,投资判断}.md, 30 Concept/{AGI,研究文化,算力,克制,愿景,开源}.md (updated)
