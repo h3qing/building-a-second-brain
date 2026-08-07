@@ -49,9 +49,9 @@ This is a system. It's not a read-later app and not a note-taking app — it's a
 **Sources go in. Ideas come out. Concepts compound. You review. Writing happens.**
 
 1. **Capture** — Drop a URL, a file, or a thought to Claude Code. It fetches the full content into an immutable `10 Notes/` source (Kindle highlights, YouTube transcripts via `yt-dlp`, articles as markdown).
-2. **Extract** — An LLM reads the source and pulls 3–10 atomic ideas — one idea per file, each with a direct quote or timestamp back to the original.
+2. **Extract** — An LLM reads the source and pulls out as many atomic ideas as it genuinely warrants (a dense book may yield fifteen, a thin article two) — one idea per file, each with a direct quote or timestamp back to the original.
 3. **Review** — Every AI idea lands `unreviewed`. You approve, contest, or edit. Approved ideas enter a Leitner spaced-repetition cycle (Easy 3× / Medium 2× / Hard 1× interval scaling, capped at 180 days).
-4. **Synthesize** — Ideas link into lean concept hub-nodes: a one-sentence definition, the tensions between sources, links to related concepts.
+4. **Synthesize** — Ideas link into lean concept hub-nodes: a one-sentence definition, the tensions between sources, links to related concepts. Every author, host, and guest also gets a person hub-node in `50 People/` — a second network over the graph: who wrote what, who interviewed whom, which thinkers cluster together.
 5. **Write** — Original essays in your voice, informed by the concept graph but never generated from it.
 
 ## Get started — build your own
@@ -68,10 +68,12 @@ cp -R vault-template ~/my-second-brain
 ```
 
 - `CLAUDE.md` — the extraction/synthesis/review pipeline Claude Code runs. Customize the **Topic Vocabulary** to your domains.
+- `.claude/skills/capture-knowledge/` — the **`/capture-knowledge` skill**: the whole ingest pipeline as a one-shot command, with the battle-tested fallbacks baked in (paywalled articles via reader proxy, YouTube transcripts via `yt-dlp`, a safe side-branch PR when sync is broken).
 - `ISA.md` + `sync.sh` — auto-sync the vault to a **private** GitHub repo via PR (handles the headless-`gh` token + macOS Full Disk Access gotchas for you).
-- `00 Meta/` — schema, templates, and a Dataview review dashboard.
+- `00 Meta/` — schema, note templates (Source / Idea / Concept / Person), and a Dataview review dashboard.
+- A worked example — a real ingested source with its extracted ideas, concepts, and a person page — so you can see the format before your first capture.
 
-Open the vault in Claude Code and say *"extract Atomic Habits"* or paste a URL. See [`vault-template/README.md`](./vault-template/README.md) for the full walkthrough.
+Open the vault in Claude Code and paste a URL, or run `/capture-knowledge <url>`. See [`vault-template/README.md`](./vault-template/README.md) for the full walkthrough.
 
 ### 2. Deploy the web app (the viewer)
 
@@ -106,6 +108,7 @@ Books / Articles / Podcasts
   Obsidian Vault                 Claude Code runs the pipeline
   10 Notes/  (raw sources)  ---> 20 Ideas/  (one idea per file)
   00 Meta/   (schema + log)      30 Concept/ (cross-source wiki)
+                                 50 People/  (person network, private)
         |                               |
         v                               v
    GitHub (private repo)          second-brain.heqinghuang.com
@@ -174,6 +177,7 @@ curl -s -H "Authorization: Bearer $RECAP_TOKEN" \
 - **AI extracts, human reviews.** Every idea starts `unreviewed`. The human is the bottleneck on purpose — internalization requires friction.
 - **Atomic ideas, not summaries.** Each idea file is one insight, not a book summary. That's what makes cross-source synthesis possible.
 - **Concepts are hub nodes, not content pages.** Backlinks do the heavy lifting; concept pages stay under 20 lines.
+- **People are nodes too.** Every author, host, and guest gets a lean hub page (`50 People/`) linking their works, related people, and related concepts — a private layer the web app never publishes, but Obsidian's graph view turns into a map of who shaped your thinking.
 - **Sources are immutable.** Raw notes are never modified after capture. Interpretation lives in the extracted layer.
 - **Spaced repetition for retention.** Reviewed ideas resurface on a schedule so knowledge compounds instead of fading.
 

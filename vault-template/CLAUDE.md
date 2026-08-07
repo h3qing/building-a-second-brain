@@ -21,6 +21,7 @@ This vault is a **personal knowledge base** following the [LLM Wiki pattern](htt
 20 Ideas/           Extracted atomic ideas per source (AI-generated, human-reviewed)
 30 Concept/         Cross-source concept synthesis (AI-maintained wiki layer)
 40 Write/           Human writing & publishing (human-owned)
+50 People/          Person hub nodes: authors, hosts, guests (AI-maintained, private)
 Inbox/              Quick capture (messy, low-friction)
 ```
 
@@ -55,6 +56,14 @@ Create `20 Ideas/Books/`, `20 Ideas/Articles/`, `20 Ideas/Podcasts/`, etc. as yo
 ### `30 Concept/` is flat (no subfolders)
 
 Concepts are source-agnostic. A concept like `[[negotiation]]` pulls insights from books, articles, conversations — anything.
+
+### `50 People/` is flat (no subfolders)
+
+People are source-agnostic hub nodes, parallel to concepts: one file per person — every author, podcast host, and guest attached to a source. A person page links out to their works in the vault, related people, and related concepts; Obsidian backlinks surface everything that mentions them. Over time this becomes a second network laid over the concept graph: who wrote what, who interviewed whom, which thinkers cluster together.
+
+**Private layer**: the web app reads only `20 Ideas/` and `30 Concept/`, so People pages sync to your private repo as backup but are never published.
+
+Filename = the person's common name (`Morgan Housel.md`, `张小珺.md`). For non-Latin names, put the romanization in `aliases` so links resolve either way.
 
 ### `40 Write/` subfolders
 
@@ -142,6 +151,42 @@ tags: []
 ---
 ```
 
+### Person notes (`50 People/`)
+
+```yaml
+---
+origin: ai-generated | ai-assisted | human
+review_status: unreviewed | in-review | reviewed | contested
+roles: []                # author | host | guest | subject — how they enter the vault
+affiliation: ""          # current org/role, short
+aliases: []              # romanization, alternate names
+last_updated: YYYY-MM-DD
+tags: []                 # their kebab-case name tag (e.g. morgan-housel) + orgs
+---
+```
+
+Person pages are lean hub nodes, same philosophy as concepts — under 25 lines:
+
+```markdown
+# Person Name
+
+One-sentence identity.
+
+## Bio
+2-4 sentences: background, what they're known for, current position.
+
+## In the Vault
+- [[Source File|Display Title]] — author / host / guest
+
+## Related People
+[[person1]] | [[person2]]
+
+## Related Concepts
+[[concept1]] | [[concept2]]
+```
+
+No idea lists, no quote collections — backlinks and the name tag (e.g. `morgan-housel` on idea files) surface their statements automatically.
+
 ### Concept note structure
 
 Concept pages are **lean hub nodes**. They do NOT list linked ideas — Obsidian's backlinks pane shows those automatically. Keep concepts minimal.
@@ -203,7 +248,7 @@ Filename format: `{Title} - {Author}.md` (or `{Title}.md` if no author)
 **Step 3 — EXTRACT: Pull atomic ideas**
 
 - Read the full source
-- Identify 3-10 distinct atomic ideas (more for longer sources)
+- Extract as many distinct atomic ideas as the source genuinely warrants — let the material set the count, not a quota. A dense book may yield fifteen; a thin article may yield two. Each idea must clear the bar of being a distinct, transferable insight worth reviewing on its own. Do not pad to hit a number, and do not truncate a rich source to stay under a cap.
 - For each idea, create a file in `20 Ideas/<type>/` with:
   - Descriptive filename (the idea itself, short)
   - Frontmatter with `review_status: unreviewed`, plus `source_date` (the source's publish/record date) and the primary person/org as tags — these anchor later **retro verification** of time-bound claims
@@ -223,6 +268,7 @@ Filename format: `{Title} - {Author}.md` (or `{Title}.md` if no author)
 - Normalize concept names: merge duplicates (e.g., `decision-making` → `[[decision]]`)
 - Do NOT add insight summaries to concept pages — Obsidian backlinks handle that automatically
 - Concept pages are hub nodes. Keep them under 20 lines.
+- **People**: for each author, host, and guest of the source, create or update their page in `50 People/` (lean format, see Person notes spec). Add the new source under `## In the Vault`, and wire `## Related People` both ways (host ↔ guest, same-cluster authors).
 
 **Step 5 — LOG: Update operational files**
 

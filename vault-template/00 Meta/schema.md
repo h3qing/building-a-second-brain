@@ -54,11 +54,24 @@ Note: Kindle Notes have their own plugin-generated frontmatter. Do not modify it
 | `source_count` | Yes | Number of sources contributing |
 | `tags` | Yes | Topic tags |
 
+### Person notes (`50 People/`)
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `origin` | Yes | Usually `ai-generated` or `ai-assisted` |
+| `review_status` | Yes | Starts as `unreviewed` |
+| `roles` | Yes | How they enter the vault: `author` / `host` / `guest` / `subject` |
+| `affiliation` | No | Current org/role, short |
+| `aliases` | No | Romanization, alternate names (so links resolve either way) |
+| `last_updated` | Yes | YYYY-MM-DD of last edit |
+| `tags` | Yes | Their kebab-case name tag (e.g. `morgan-housel`) + orgs |
+
 ## Naming Conventions
 
 - **Source files**: `{Title} - {Author}.md` (e.g., `Atomic Habits - Clear.md`)
 - **Idea files**: Short descriptive title of the idea (e.g., `habits are compound interest.md`)
 - **Concept files**: Lowercase concept name (e.g., `negotiation.md`, `decision-making.md`)
+- **Person files**: The person's common name (e.g., `Morgan Housel.md`, `张小珺.md`)
 - Use hyphens for multi-word concept filenames, title case for display
 
 ## Wikilink Conventions
