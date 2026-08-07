@@ -1,5 +1,6 @@
-import { getFileViaTree, listCommits } from "@/lib/github";
+import { listCommits } from "@/lib/github";
 import { parseFrontmatter } from "@/lib/parser";
+import { resolveSourceFile } from "@/lib/source";
 import { parseReviewEvents } from "@/lib/review-stats";
 import {
   toISODate,
@@ -45,17 +46,10 @@ export async function IdeaJourney({
   const sourceType =
     typeof frontmatter.source_type === "string" ? frontmatter.source_type : "";
 
-  // Source note path from the wikilink (strip any |alias).
-  const sourceLink =
-    typeof frontmatter.source === "string"
-      ? frontmatter.source.replace(/\[\[|\]\]/g, "").split("|")[0].trim()
-      : "";
-
   const [commits, sourceFile] = await Promise.all([
     listCommits().catch(() => []),
-    sourceLink.startsWith("10 Notes/")
-      ? getFileViaTree(sourceLink.endsWith(".md") ? sourceLink : `${sourceLink}.md`).catch(() => null)
-      : Promise.resolve(null),
+    // Shared resolver: handles both full-path and bare-filename wikilinks.
+    resolveSourceFile(frontmatter).catch(() => null),
   ]);
 
   const capturedDate = sourceFile

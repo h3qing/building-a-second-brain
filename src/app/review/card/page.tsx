@@ -7,6 +7,7 @@ import { parseReviewItem } from "@/lib/parser";
 import { getReviewQueue, queueForCard, cardHref } from "@/lib/review-queue";
 import { ReviewCardForm } from "./insight-editor";
 import { IdeaJourney } from "./journey";
+import { SourceCard } from "./source-card";
 import { reviewAction } from "@/app/review/action";
 
 export default async function CardReview({
@@ -145,6 +146,12 @@ export default async function CardReview({
           {item.title}
         </h1>
       </header>
+
+      {/* Where this idea comes from — cover, title, author. Loads in after
+          the card so the source lookup never blocks first paint. */}
+      <Suspense fallback={null}>
+        <SourceCard frontmatter={item.frontmatter} path={currentPath} />
+      </Suspense>
 
       {/* Journey timeline — the idea's life story, loads in after the card */}
       <Suspense fallback={null}>
