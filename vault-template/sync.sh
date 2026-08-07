@@ -15,7 +15,7 @@ REPO_PATH="$HOME/code/second-brain"            # where the .git dir lives (NOT i
 VAULT_PATH="$HOME/Documents/Obsidian Vault"    # your Obsidian vault (the work tree)
 GH_REPO="your-username/your-vault-repo"        # private GitHub repo, owner/name
 # Top-level folders to name in commit messages:
-FOLDERS=("00 Meta" "10 Notes" "20 Ideas" "30 Concept" "40 Write" "Inbox")
+FOLDERS=("00 Meta" "10 Notes" "20 Ideas" "30 Concept" "40 Write" "50 People" "Inbox")
 # ──────────────────────────────────────────────────────────────────────────────
 
 LOG="$REPO_PATH/.sync.log"
