@@ -2,11 +2,12 @@ import { listFiles, getFilesContent } from "./github";
 import { parseFrontmatter, extractTitle } from "./parser";
 import { extractSection, firstParagraph } from "./markdown";
 
-// A source (book or podcast) that feeds a concept, derived from the idea notes
-// that cite it. Podcasts carry an episode URL when one is available.
+// A source that feeds a concept, derived from the idea notes that cite it.
+// `type` is the note's own source_type so each chip gets its real icon.
+// YouTube-hosted sources (podcasts and videos) carry an episode URL.
 export interface TensionSource {
   name: string;
-  type: "book" | "podcast";
+  type: string;
   url?: string;
 }
 
@@ -53,9 +54,12 @@ async function buildConceptSources(): Promise<Map<string, TensionSource[]>> {
         : "";
     if (!sourceName) continue;
 
-    const type: TensionSource["type"] =
-      frontmatter.source_type === "podcast" ? "podcast" : "book";
-    const urlMatch = type === "podcast" ? content.match(YT_RE) : null;
+    const type =
+      typeof frontmatter.source_type === "string"
+        ? frontmatter.source_type
+        : "book";
+    const urlMatch =
+      type === "podcast" || type === "video" ? content.match(YT_RE) : null;
     // Drop the timestamp (e.g. &t=605s, &t=1h2m3s) so the chip opens the episode.
     const url = urlMatch
       ? urlMatch[0].replace(/[?&]t=[\dhms]+/, "")

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getTensions } from "@/lib/tensions";
+import { typeMeta } from "@/lib/source";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,7 @@ export default async function TensionsPage() {
               {t.sources.length > 0 && (
                 <div className="flex flex-wrap gap-2 pt-1">
                   {t.sources.map((s) => {
-                    const icon = s.type === "podcast" ? "🎙" : "📖";
+                    const icon = typeMeta(s.type).icon;
                     const className =
                       "inline-flex items-center gap-1.5 text-xs px-2.5 py-1 border border-border rounded-sm text-muted font-mono";
                     return s.url ? (
