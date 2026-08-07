@@ -6,15 +6,19 @@ An open-source pipeline + web app that ingests books, podcasts, and articles, us
 
 [![Live demo](https://img.shields.io/badge/demo-second-brain.heqinghuang.com-2563eb)](https://second-brain.heqinghuang.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
-[![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 
 **▶ Live demo:** [second-brain.heqinghuang.com](https://second-brain.heqinghuang.com) — a real second brain built from 150+ books.
 
 <!-- screenshots:start -->
 <p align="center">
-  <img src="./docs/screenshot-graph.png" alt="Knowledge graph homepage with pipeline diagram and force-directed graph" width="780"><br>
-  <em>The homepage: the pipeline diagram, live stats, and a force-directed graph of every concept.</em>
+  <img src="./docs/screenshot-graph.png" alt="Homepage: a 450-node force-directed knowledge graph of concepts, ideas, sources, and essays, with 2D/3D toggle and live stats" width="780"><br>
+  <em>The homepage: every concept, idea, source, and essay in one force-directed graph (2D/3D). Notes due for review glow. Stats are live.</em>
+</p>
+<p align="center">
+  <img src="./docs/screenshot-review-card.png" alt="A review card: the idea title, the source book with its cover, the idea's review journey, the original highlight, and a hidden insight behind a Reveal button" width="780"><br>
+  <em>A review card — the source front and center, the idea's life story, the original highlight, and the insight hidden until you recall it. This is where knowledge actually sticks.</em>
 </p>
 <p align="center">
   <img src="./docs/screenshot-concept.png" alt="A concept page synthesizing tensions across multiple sources" width="780"><br>
@@ -120,7 +124,7 @@ Books / Articles / Podcasts
 | Source of truth | Obsidian vault | Markdown + YAML frontmatter |
 | AI pipeline | Extraction, synthesis, spaced repetition | Claude Code + `CLAUDE.md` |
 | Sync | Auto-push to GitHub via PR | Git (detached work-tree) + cron/launchd |
-| Web app | Public graph + private review | Next.js 15, Vercel |
+| Web app | Public graph + private review | Next.js 16, Vercel |
 | Data | Read vault, write review decisions | GitHub REST API |
 | Auth | PIN-protected review pages | bcrypt + HMAC sessions |
 
