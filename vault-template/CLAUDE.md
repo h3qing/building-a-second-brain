@@ -217,7 +217,7 @@ The human may provide input in several forms. **When the user sends a URL or tex
 |-------|------|---------------|
 | URL to article/blog | `article` | WebFetch → full markdown text |
 | URL to YouTube video | `video` or `podcast` | `yt-dlp` → transcript (requires yt-dlp installed) |
-| URL to podcast page | `podcast` | WebFetch → show notes; note if transcript unavailable |
+| URL to podcast page | `podcast` | [Podcast Index](../docs/podcast-index.md) → resolve feed/episode, fetch `transcriptUrl` or RSS `<podcast:transcript>`; else WebFetch show notes and note if transcript unavailable |
 | URL (ambiguous) | Infer type | WebFetch the page, detect from content |
 | Pasted/typed text about something they read/heard | Infer type | Use text as-is — this is the human's synthesis |
 | Pasted/typed personal reflection | `personal` | Use text as-is |
@@ -230,7 +230,7 @@ The human may provide input in several forms. **When the user sends a URL or tex
 
 - **URL → article/blog**: Use WebFetch to get the full article as markdown. Preserve the complete text — do not summarize at this stage.
 - **URL → YouTube**: Use `yt-dlp --write-auto-subs --skip-download --sub-lang en` to get transcript. If yt-dlp unavailable, use WebFetch on the page and note that transcript is incomplete.
-- **URL → podcast (no YouTube)**: WebFetch the page for show notes and metadata. If no transcript available, note it and ask the human to describe key takeaways.
+- **URL → podcast (no YouTube)**: Use [Podcast Index](../docs/podcast-index.md) to search/resolve the show, load the episode (`/episodes/byid` or by feed), and fetch a real transcript via `transcriptUrl` or RSS `<podcast:transcript>`. **No transcript → no Ideas** — record the gap in the source note; do not invent text. Fallback: WebFetch the page for show notes and metadata only.
 - **Text input**: Use exactly as provided. The human's own words are the source.
 - **Inbox file**: Read the file contents.
 

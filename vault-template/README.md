@@ -7,6 +7,7 @@ This folder is a **starter Obsidian vault** wired for the Building a Second Brai
 ```
 CLAUDE.md                  The pipeline. Claude Code loads this every session.
 ISA.md                     Design + setup for the GitHub auto-sync layer.
+../docs/podcast-index.md   Podcast Index catalog API — resolve RSS, episodes, transcripts.
 sync.sh                    Ready-to-use sync script (edit the Variables block).
 .gitignore                 Keeps secrets out of the synced repo.
 .claude/skills/
