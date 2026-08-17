@@ -47,8 +47,10 @@ do with this?".
   capture method + any truncation in the source note.
 - **YouTube**: `yt-dlp --write-auto-subs --skip-download --sub-lang en <URL>` for the
   transcript. If yt-dlp is missing, WebFetch the page and flag transcript incomplete.
-- **Podcast (non-YouTube)**: WebFetch show notes/metadata; if no transcript, say so
-  and ask the human for key takeaways.
+- **Podcast (non-YouTube)**: follow [`docs/podcast-index.md`](../../docs/podcast-index.md) —
+  Podcast Index to resolve feed/episode and fetch `transcriptUrl` or RSS
+  `<podcast:transcript>`. **No transcript → no Ideas**; note the gap, do not invent.
+  Fallback: WebFetch show notes/metadata only.
 - **Pasted text**: use verbatim — the human's words ARE the source; set `origin: human`.
 - **Inbox file**: read it, infer type, triage.
 
