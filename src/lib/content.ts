@@ -1,5 +1,9 @@
 import { listFiles, getFileViaTree } from "./github";
-import { parseFrontmatter, extractTitle } from "./parser";
+import {
+  parseFrontmatter,
+  extractTitle,
+  inlineEmbeddedHighlights,
+} from "./parser";
 import { remark } from "remark";
 import remarkGfm from "remark-gfm";
 import remarkRehype from "remark-rehype";
@@ -160,7 +164,12 @@ export async function findIdeaBySlug(slug: string): Promise<{
       if (frontmatter.review_status !== "reviewed") return null;
 
       const title = extractTitle(content, entry.path);
-      const bodyHtml = await renderMarkdown(content, fileIndex);
+      // Ideas cite book sources with Obsidian block embeds; resolve them to the
+      // actual highlight before rendering, or the raw syntax reaches the page.
+      const bodyHtml = await renderMarkdown(
+        await inlineEmbeddedHighlights(content),
+        fileIndex
+      );
 
       return { path: entry.path, content, frontmatter, title, bodyHtml };
     }

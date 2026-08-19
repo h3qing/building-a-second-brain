@@ -38,6 +38,22 @@ export async function resolveSourceFile(
   return entry ? getFileViaTree(entry.path).catch(() => null) : null;
 }
 
+// One icon/label per source type, shared by every surface that shows a source
+// chip or card — so a video never renders as a book.
+export const TYPE_META: Record<string, { icon: string; label: string }> = {
+  book: { icon: "📖", label: "Book" },
+  podcast: { icon: "🎙", label: "Podcast" },
+  article: { icon: "📰", label: "Article" },
+  video: { icon: "🎬", label: "Video" },
+  conversation: { icon: "💬", label: "Conversation" },
+  course: { icon: "🎓", label: "Course" },
+  personal: { icon: "✍️", label: "Personal note" },
+};
+
+export function typeMeta(type: string) {
+  return TYPE_META[type] || { icon: "📚", label: "Source" };
+}
+
 function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }

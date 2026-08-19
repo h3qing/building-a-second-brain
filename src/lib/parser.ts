@@ -42,11 +42,13 @@ export function extractTitle(content: string, path: string): string {
   return filename.replace(/\.md$/, "");
 }
 
+const EMBED_RE = /!\[\[([^\]]+?)#\^(ref-\d+)\]\]/g;
+
 function extractEmbedRefs(content: string): string[] {
-  const regex = /!\[\[([^\]]+?)#\^(ref-\d+)\]\]/g;
+  EMBED_RE.lastIndex = 0;
   const refs: string[] = [];
   let match;
-  while ((match = regex.exec(content)) !== null) {
+  while ((match = EMBED_RE.exec(content)) !== null) {
     refs.push(`${match[1]}#^${match[2]}`);
   }
   return refs;
@@ -162,6 +164,27 @@ export async function resolveHighlights(
   }
 
   return highlights;
+}
+
+// Public pages render the note body as-is, so an Obsidian block embed
+// (`![[Book - Author#^ref-123]]`) leaks its raw syntax onto the page — the
+// wikilink pass can't resolve it because the `#^ref` suffix isn't a filename.
+// Swap each embed for the highlight it points at, as a real blockquote; an
+// embed that can't be resolved is dropped rather than shown as broken markup.
+export async function inlineEmbeddedHighlights(
+  content: string
+): Promise<string> {
+  const byRef = new Map(
+    (await resolveHighlights(content)).map((h) => [h.ref, h])
+  );
+  EMBED_RE.lastIndex = 0;
+  return content.replace(EMBED_RE, (_match, _source, ref: string) => {
+    const highlight = byRef.get(ref);
+    if (!highlight) return "";
+    return highlight.location
+      ? `> ${highlight.text}\n>\n> ${highlight.location}`
+      : `> ${highlight.text}`;
+  });
 }
 
 export async function parseReviewItem(

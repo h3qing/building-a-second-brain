@@ -1,14 +1,4 @@
-import { getSourceInfo } from "@/lib/source";
-
-const TYPE_META: Record<string, { icon: string; label: string }> = {
-  book: { icon: "📖", label: "Book" },
-  podcast: { icon: "🎙", label: "Podcast" },
-  article: { icon: "📰", label: "Article" },
-  video: { icon: "🎬", label: "Video" },
-  conversation: { icon: "💬", label: "Conversation" },
-  course: { icon: "🎓", label: "Course" },
-  personal: { icon: "✍️", label: "Personal note" },
-};
+import { getSourceInfo, typeMeta } from "@/lib/source";
 
 // Prominent "where this idea comes from" block. Reviewing an idea without its
 // source in view strips the context that made it worth capturing — so the
@@ -24,7 +14,7 @@ export async function SourceCard({
   const info = await getSourceInfo(frontmatter, path);
   if (!info || !info.title) return null;
 
-  const meta = TYPE_META[info.type] || { icon: "📚", label: "Source" };
+  const meta = typeMeta(info.type);
   const year = info.sourceDate ? String(info.sourceDate).slice(0, 4) : "";
 
   const body = (
