@@ -6,15 +6,13 @@ import {
   firm,
   practiceAreas,
 } from "@/content/site";
-import { Arcade, MailMark, Monogram, PhoneMark, PinMark } from "./Illustrations";
+import { MailMark, Monogram, PhoneMark, PinMark } from "./Illustrations";
 
 export function SiteFooter() {
   const year = new Date().getFullYear();
 
   return (
     <footer className="ftr">
-      <Arcade className="ftr__arcade" bays={14} />
-
       <div className="container ftr__inner">
         <div className="ftr__brand">
           <Monogram className="ftr__mark" />

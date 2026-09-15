@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Reveal } from "@/components/Reveal";
-import { Monogram, PhoneMark } from "@/components/Illustrations";
+import { Photo } from "@/components/Photo";
+import { PhoneMark } from "@/components/Illustrations";
+import { images } from "@/content/images";
 import {
   attorney,
   contact,
-  firm,
-  legacyCopy,
+    legacyCopy,
   practiceAreas,
 } from "@/content/site";
 
@@ -47,19 +48,12 @@ export default function AttorneyPage() {
           </div>
 
           <Reveal className="bio__portrait" delay={100}>
-            {/* No photograph on file; the monogram holds the space with more
-                dignity than a stock image would. */}
-            <div className="bio__plate">
-              <Monogram className="bio__plate-mark" />
-              <p className="bio__plate-name">{firm.name}</p>
-              <p className="bio__plate-suite">Suite 300</p>
-            </div>
+            <Photo image={images.attorney} className="bio__photo" eager />
           </Reveal>
         </div>
       </section>
 
       <section className="section--tight on-dark creds">
-        <span className="screen screen--top" aria-hidden="true" />
         <div className="container creds__inner">
           <Reveal>
             <p className="eyebrow">Credentials</p>

@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Reveal } from "@/components/Reveal";
+import { Photo } from "@/components/Photo";
 import { PhoneMark, PracticeArt } from "@/components/Illustrations";
+import { practiceImages } from "@/content/images";
 import { contact, disclaimer, practiceAreas } from "@/content/site";
 
 type Params = { slug: string };
@@ -56,7 +58,14 @@ export default async function PracticeAreaPage({
             <h1 className="display display-xl page-head__title">{area.title}</h1>
             <p className="lede page-head__lede">{area.blurb}</p>
           </div>
-          <PracticeArt art={area.art} accent={area.accent} className="page-head__art" />
+          <Photo
+            image={practiceImages[area.slug]}
+            className="page-head__photo"
+            eager
+            fallback={
+              <PracticeArt art={area.art} accent={area.accent} className="page-head__art" />
+            }
+          />
         </div>
       </section>
 

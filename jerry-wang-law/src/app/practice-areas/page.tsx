@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Reveal } from "@/components/Reveal";
+import { Photo } from "@/components/Photo";
 import { ArrowMark, PhoneMark, PracticeArt } from "@/components/Illustrations";
+import { practiceImages } from "@/content/images";
 import { contact, legacyCopy, practiceAreas } from "@/content/site";
 
 export const metadata: Metadata = {
@@ -44,7 +46,13 @@ export default function PracticeAreasPage() {
                   <span className="pa-row__numeral figure-numeral">
                     {String(index + 1).padStart(2, "0")}
                   </span>
-                  <PracticeArt art={area.art} accent={area.accent} className="pa-row__art" />
+                  <Photo
+                    image={practiceImages[area.slug]}
+                    className="pa-row__photo"
+                    fallback={
+                      <PracticeArt art={area.art} accent={area.accent} className="pa-row__art" />
+                    }
+                  />
                   <span className="pa-row__text">
                     <span className="display display-md pa-row__title">
                       {area.title}

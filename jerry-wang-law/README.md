@@ -29,22 +29,20 @@ pastels) is invited.
 - **Type.** Bodoni Moda for display, Jost for everything else — the canonical
   modernist pairing. Self-hosted through `next/font`, so no request reaches
   Google when someone opens the site.
-- **Illustration.** Every drawing is hand-written SVG in `components/Illustrations.tsx`
-  — flat colour, three colours each. The largest is the waiting room on the
-  home and contact pages: the firm's own room, drawn from its own photographs
-  rather than invented — the two black swivel chairs, the glass side table, the
-  floor-to-ceiling blinds, the dracaena. Those chairs were already mid-century;
-  nobody staged them.
-- **No photography.** Not a stylistic choice so much as an honest one: no
-  photographs of the office, the building, or the attorney were available, and
-  stock images of somebody else's boardroom would be worse than none. Real
-  photographs of this office would improve the site more than anything else
-  listed here, and the layout has room for them.
+- **Photographs.** The site is built around pictures of mid-century design —
+  a real interior in the hero, the firm's own reception, a portrait, and one
+  detail per practice area. They are not checked in yet. Every picture goes
+  through `components/Photo.tsx`, which checks at build time whether the file
+  is in `/public/images` and renders either the photograph or a labelled slot
+  in the same proportions, so the layout can be judged before the pictures
+  arrive. **`SHOT-LIST.md` says exactly what to source, at what size, and
+  what the rights need to be.** Drop a file in, rebuild, done.
+- **Drawn marks.** One small mark per practice area, in
+  `components/Illustrations.tsx`, does wayfinding in the menu and stands in
+  for an area's photograph until it exists.
 - **Colour blocking.** Each practice area carries its own chip from the palette,
-  the way Alexander Girard blocked a textile range. The colour appears in the
-  area's illustration, its card rule, and its page.
-- **Motifs.** A brass-line arcade and a breeze-block screen — the perforated
-  wall of every mid-century California building.
+  the way Alexander Girard blocked a textile range: a rule on its card, its
+  mark, its page.
 
 ### Accessibility
 
@@ -79,12 +77,9 @@ real. The per-practice-area prose was written for this rebuild and is marked
 and because California's Rules of Professional Conduct 7.1–7.5 govern what a
 law firm may say in its own advertising.
 
-Two things the old site did not publish and this one therefore does not invent:
-
-- **Office hours.** Worth adding — "are they open now?" is a common reason
-  someone leaves a law firm's site.
-- **A portrait.** The attorney page holds the space with the monogram instead
-  of a stock photograph.
+One thing the old site did not publish and this one therefore does not invent:
+**office hours.** Worth adding — "are they open now?" is a common reason
+someone leaves a law firm's site.
 
 ## Navigation
 
