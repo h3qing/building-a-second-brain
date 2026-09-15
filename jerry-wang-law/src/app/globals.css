@@ -16,7 +16,7 @@
 
   /* ---- The upholstery: wool, ceramic, leather ------------------------- */
   --ochre: #d19b33;      /* mustard wool — the primary accent */
-  --ochre-lt: #e0b96b;   /* type on dark panels */
+  --ochre-lt: #e9c887;   /* type on dark panels — see README */
   --persimmon: #c0522a;  /* burnt orange — used as shape, never as small type */
   --teak: #a96c3c;       /* the lighter wood */
   --cognac: #a05a28;     /* leather */
@@ -90,8 +90,10 @@ body {
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  /* Paper grain — barely there, but it stops the flat fields looking digital */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  /* Travertine underfoot — baked seamless, so it tiles down a long page
+     without a visible join. */
+  background-image: url("/textures/travertine.jpg");
+  background-repeat: repeat;
 }
 
 img,
@@ -375,16 +377,20 @@ select {
    -------------------------------------------------------------------------- */
 
 .on-dark {
+  /* A real sawn board, baked by tools/bake-textures.mjs. The colour beneath
+     is the fallback and the tone the grain is cut from. */
   background-color: var(--walnut);
+  background-image: url("/textures/walnut.jpg");
+  background-size: cover;
+  background-position: center;
   color: var(--paper);
-  /* Grain, stretched along the horizontal so the panel reads as a sawn
-     board rather than a field of colour. */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.008 0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='420' height='220' filter='url(%23g)' opacity='0.09'/%3E%3C/svg%3E");
 }
 
 /* The cool counterpoint: one glazed-ceramic band per page, no more. */
+/* Glazed ceramic is flat by nature — no grain here. */
 .on-dark--teal {
   background-color: var(--teal);
+  background-image: none;
 }
 .on-dark .eyebrow {
   color: var(--ochre-lt);
@@ -1096,7 +1102,9 @@ select {
 /* Fact strip */
 .hero__facts {
   border-top: 1px solid var(--rule-on-dark);
-  background: color-mix(in srgb, var(--walnut-dk) 55%, var(--walnut));
+  /* Translucent, so the board carries on underneath instead of being
+     covered by a flat panel. */
+  background: color-mix(in srgb, var(--walnut-dk) 62%, transparent);
 }
 
 .hero__facts-inner {
@@ -2209,4 +2217,55 @@ a.hero__fact-value:hover {
   background: var(--card-accent, var(--ochre));
   width: 5.5rem;
   margin-bottom: 1.75rem;
+}
+
+/* --------------------------------------------------------------------------
+   28. The office
+   The one section that leaves the column. Everything else on the page is
+   measured to the same container; this runs edge to edge, which is what
+   makes it register as a different kind of thing.
+   -------------------------------------------------------------------------- */
+
+.office {
+  padding-top: var(--section-y);
+}
+
+.office__head {
+  max-width: 46rem;
+}
+
+.office__title {
+  margin-top: 1.25rem;
+  max-width: 16ch;
+}
+
+.office__address {
+  margin-top: 1rem;
+  margin-bottom: 1.75rem;
+}
+
+.office__figure {
+  margin: clamp(2.5rem, 5vw, 4rem) 0 0;
+}
+
+.office__figure--flush {
+  margin-top: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+.office__scene {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.office__caption {
+  max-width: var(--container);
+  margin-inline: auto;
+  padding: 0.9rem var(--gutter) 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--stone);
 }

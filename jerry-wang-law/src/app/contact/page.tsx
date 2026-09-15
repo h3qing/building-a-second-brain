@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactForm } from "@/components/ContactForm";
 import { Reveal } from "@/components/Reveal";
-import { MailMark, PhoneMark, PinMark } from "@/components/Illustrations";
+import { MailMark, OfficeScene, PhoneMark, PinMark } from "@/components/Illustrations";
 import { consultation, contact, firm } from "@/content/site";
 
 export const metadata: Metadata = {
@@ -27,6 +27,13 @@ export default function ContactPage() {
           <hr className="rule-pair page-head__rule" />
         </div>
       </section>
+
+      <figure className="office__figure office__figure--flush">
+        <OfficeScene className="office__scene" />
+        <figcaption className="office__caption">
+          The waiting room at Suite 300.
+        </figcaption>
+      </figure>
 
       <section className="section--tight">
         <div className="container contact">

@@ -316,6 +316,195 @@ export function PracticeArt({
   return <Component className={className} accent={accent} />;
 }
 
+
+/* -------------------------------------------------------------------------
+   The waiting room.
+
+   Drawn from the firm's own office rather than invented: the pair of black
+   swivel chairs, the glass side table, the floor-to-ceiling vertical blinds,
+   the dracaena in a terracotta pot. Those chairs are mid-century by
+   accident — they were already in the room. No photograph is used; this is
+   the room, drawn.
+   ------------------------------------------------------------------------- */
+
+const SCENE_W = 980;
+const SCENE_H = 380;
+const FLOOR = 262;
+
+function Chair({
+  x,
+  y,
+  scale,
+  flip = false,
+}: {
+  x: number;
+  y: number;
+  scale: number;
+  flip?: boolean;
+}) {
+  return (
+    <g transform={`translate(${x} ${y}) scale(${flip ? -scale : scale} ${scale})`}>
+      <ellipse cx="0" cy="80" rx="74" ry="11" fill="var(--ink)" opacity="0.18" />
+      <path
+        d="M -66 -4 C -75 -62 -47 -88 0 -88 C 47 -88 75 -62 66 -4 C 66 15 41 27 0 27 C -41 27 -66 15 -66 -4 Z"
+        fill="var(--ink)"
+      />
+      {/* light rolling off the shoulder, so the shell reads as leather */}
+      <path
+        d="M -56 -34 C -58 -66 -34 -80 -4 -80"
+        fill="none"
+        stroke="#5c4536"
+        strokeWidth="7"
+        strokeLinecap="round"
+        opacity="0.9"
+      />
+      <path
+        d="M -55 -6 C -55 -22 -31 -32 0 -32 C 31 -32 55 -22 55 -6 C 55 8 31 18 0 18 C -31 18 -55 8 -55 -6 Z"
+        fill="#3d2b20"
+      />
+      <ellipse cx="0" cy="-2" rx="43" ry="11" fill="#16100b" opacity="0.5" />
+      <path d="M -8 27 L 8 27 L 5.5 56 L -5.5 56 Z" fill="#9c9488" />
+      <g stroke="#b3ab9d" strokeWidth="5" strokeLinecap="round" fill="none">
+        <path d="M0 56 L -52 72" />
+        <path d="M0 56 L -20 80" />
+        <path d="M0 56 L 20 80" />
+        <path d="M0 56 L 52 72" />
+      </g>
+      <ellipse cx="0" cy="56" rx="10" ry="3.6" fill="#c4bcae" />
+    </g>
+  );
+}
+
+/** Blades that arc out and fall, rather than spikes radiating from a point. */
+const BLADES: Array<[number, number, number, number]> = [
+  [-96, 132, 15, 0.55],
+  [-70, 150, 17, 0.5],
+  [-44, 126, 14, 0.62],
+  [-16, 156, 16, 0.42],
+  [10, 138, 15, 0.5],
+  [36, 158, 17, 0.45],
+  [62, 130, 14, 0.6],
+  [88, 144, 16, 0.55],
+  [108, 116, 13, 0.68],
+  [-114, 112, 13, 0.66],
+];
+const GREENS = ["#44552c", "#6b6b39", "#3a4d30", "#55632f"];
+
+function Dracaena({ cx, cy }: { cx: number; cy: number }) {
+  return (
+    <>
+      {BLADES.map(([deg, length, width, droop], i) => {
+        const a = ((deg - 90) * Math.PI) / 180;
+        const tipX = cx + length * Math.cos(a);
+        const tipY = cy + length * Math.sin(a) + length * droop * 0.55;
+        const mx = cx + (tipX - cx) * 0.5;
+        const my = cy + (tipY - cy) * 0.5 - length * 0.16;
+        const px = -Math.sin(a) * width;
+        const py = Math.cos(a) * width;
+        return (
+          <path
+            key={i}
+            d={`M ${cx} ${cy} Q ${mx + px * 0.5} ${my + py * 0.5} ${tipX} ${tipY} Q ${mx - px * 0.6} ${my - py * 0.6} ${cx} ${cy} Z`}
+            fill={GREENS[i % GREENS.length]}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+export function OfficeScene({ className }: ArtProps) {
+  const bays = 30;
+  const slatW = SCENE_W / bays;
+
+  return (
+    <svg
+      viewBox={`0 0 ${SCENE_W} ${SCENE_H}`}
+      className={className}
+      role="img"
+      aria-label="The firm's waiting room: two black swivel chairs either side of a glass side table, against floor-to-ceiling vertical blinds, with a dracaena in a terracotta pot."
+    >
+      <defs>
+        <linearGradient id="jw-fall" x1="0" y1="0" x2="0.2" y2="1">
+          <stop offset="0" stopColor="#ffffff" stopOpacity="0.16" />
+          <stop offset="0.6" stopColor="#241811" stopOpacity="0.05" />
+          <stop offset="1" stopColor="#241811" stopOpacity="0.2" />
+        </linearGradient>
+        <radialGradient id="jw-warm" cx="0.26" cy="0.12" r="0.75">
+          <stop offset="0" stopColor="#d19b33" stopOpacity="0.3" />
+          <stop offset="1" stopColor="#d19b33" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      <rect width={SCENE_W} height={SCENE_H} fill="var(--paper)" />
+
+      {/* Blinds. Brightness swings in broad bands so the light reads as
+          raking across the slats instead of an even stripe. */}
+      {Array.from({ length: bays }, (_, i) => {
+        const u = i / (bays - 1);
+        const glow = Math.pow(0.5 + 0.5 * Math.sin(u * Math.PI * 2.4 - 0.6), 1.6);
+        return (
+          <g key={i}>
+            <rect
+              x={i * slatW}
+              y={12}
+              width={slatW}
+              height={FLOOR - 12}
+              fill={i % 2 === 0 ? "#efe7d8" : "#e2d6be"}
+            />
+            <rect
+              x={i * slatW}
+              y={12}
+              width={slatW}
+              height={FLOOR - 12}
+              fill="#f6e9c8"
+              opacity={glow * 0.75}
+            />
+          </g>
+        );
+      })}
+
+      <rect x="0" y="12" width={SCENE_W} height={FLOOR - 12} fill="url(#jw-fall)" />
+      <rect x="0" y="12" width={SCENE_W} height={FLOOR - 12} fill="url(#jw-warm)" />
+      <rect x="0" y="0" width={SCENE_W} height="12" fill="#c6b9a1" />
+
+      {/* the pull cord */}
+      <line x1="760" y1="12" x2="760" y2="132" stroke="#b6ab99" strokeWidth="2" />
+      <circle cx="760" cy="136" r="4" fill="#b6ab99" />
+
+      <rect x="0" y={FLOOR} width={SCENE_W} height={SCENE_H - FLOOR} fill="#8f8477" />
+      <rect x="0" y={FLOOR - 6} width={SCENE_W} height="6" fill="#6b6255" />
+      <path
+        d={`M0 ${FLOOR} L${SCENE_W} ${FLOOR} L${SCENE_W} ${FLOOR + 44} L0 ${FLOOR + 62} Z`}
+        fill="#f6e9c8"
+        opacity="0.1"
+      />
+
+      <Chair x={286} y={FLOOR - 14} scale={1.2} />
+      <Chair x={586} y={FLOOR - 8} scale={1.26} flip />
+
+      <g transform={`translate(436 ${FLOOR - 78})`}>
+        <ellipse cx="6" cy="92" rx="40" ry="7" fill="var(--ink)" opacity="0.14" />
+        <ellipse cx="0" cy="0" rx="44" ry="12" fill="var(--ochre-lt)" opacity="0.8" />
+        <ellipse cx="0" cy="0" rx="44" ry="12" fill="none" stroke="#b3ab9d" strokeWidth="3" />
+        <g stroke="#b3ab9d" strokeWidth="3.5" strokeLinecap="round">
+          <path d="M -27 7 L -34 84" />
+          <path d="M 27 7 L 34 84" />
+          <path d="M 0 11 L 0 88" />
+        </g>
+      </g>
+
+      <g transform={`translate(856 ${FLOOR + 34})`}>
+        <ellipse cx="0" cy="24" rx="46" ry="8" fill="var(--ink)" opacity="0.16" />
+        <Dracaena cx={0} cy={-104} />
+        <rect x="-4" y="-104" width="8" height="66" fill="#6b4a2c" />
+        <path d="M -34 -42 L 34 -42 L 25 22 L -25 22 Z" fill="var(--cognac)" />
+        <rect x="-38" y="-49" width="76" height="11" fill="#8a4a20" />
+      </g>
+    </svg>
+  );
+}
+
 /* -------------------------------------------------------------------------
    Small marks used in the interface.
    ------------------------------------------------------------------------- */

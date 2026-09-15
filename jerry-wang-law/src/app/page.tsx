@@ -2,8 +2,8 @@ import Link from "next/link";
 import { Reveal } from "@/components/Reveal";
 import {
   ArrowMark,
-  Arcade,
   HeroArt,
+  OfficeScene,
   PhoneMark,
   PracticeArt,
 } from "@/components/Illustrations";
@@ -162,6 +162,38 @@ export default function HomePage() {
             <p>{consultation.promise}</p>
           </Reveal>
         </div>
+      </section>
+
+
+      {/* ================= The office ==================================== */}
+      <section className="office">
+        <div className="container office__head">
+          <Reveal>
+            <p className="eyebrow">The office</p>
+            <h2 className="display display-lg office__title">
+              {contact.building}.
+            </h2>
+            <p className="lede office__address">
+              {contact.street} · {contact.city}, {contact.state} {contact.zip}
+            </p>
+            <a
+              className="btn btn--ghost"
+              href={contact.mapsHref}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Directions
+            </a>
+          </Reveal>
+        </div>
+
+        {/* Full bleed on purpose — the one place the page leaves its column. */}
+        <figure className="office__figure">
+          <OfficeScene className="office__scene" />
+          <figcaption className="office__caption">
+            Suite 300, drawn from the room itself.
+          </figcaption>
+        </figure>
       </section>
 
       {/* ================= Attorney ====================================== */}

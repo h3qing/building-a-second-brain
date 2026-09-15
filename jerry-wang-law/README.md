@@ -18,12 +18,28 @@ horizontals, geometric reduction, Didone-and-geometric-sans typography — does
 the work of gravitas. None of the period's kitsch (starbursts, boomerangs,
 pastels) is invited.
 
+- **Material.** The dark panels are a real sawn board and the ground is real
+  travertine, generated in `tools/bake-textures.mjs` and baked into images. The
+  grain comes from turbulence stretched along one axis and then pushed through
+  a periodic transfer function, which is what breaks smooth noise into grain
+  lines; a noise overlay alone just reads as static over brown. Running that
+  filter live on a full-width panel costs a repaint of a hundred milliseconds
+  or more, so it is rendered once at design time and shipped flat (244 KB for
+  both). Re-bake with `node tools/bake-textures.mjs`.
 - **Type.** Bodoni Moda for display, Jost for everything else — the canonical
   modernist pairing. Self-hosted through `next/font`, so no request reaches
   Google when someone opens the site.
 - **Illustration.** Every drawing is hand-written SVG in `components/Illustrations.tsx`
-  — flat colour, no gradients, three colours each. There is no photography and
-  no stock imagery anywhere on the site.
+  — flat colour, three colours each. The largest is the waiting room on the
+  home and contact pages: the firm's own room, drawn from its own photographs
+  rather than invented — the two black swivel chairs, the glass side table, the
+  floor-to-ceiling blinds, the dracaena. Those chairs were already mid-century;
+  nobody staged them.
+- **No photography.** Not a stylistic choice so much as an honest one: no
+  photographs of the office, the building, or the attorney were available, and
+  stock images of somebody else's boardroom would be worse than none. Real
+  photographs of this office would improve the site more than anything else
+  listed here, and the layout has room for them.
 - **Colour blocking.** Each practice area carries its own chip from the palette,
   the way Alexander Girard blocked a textile range. The colour appears in the
   area's illustration, its card rule, and its page.
@@ -41,6 +57,11 @@ keeping if the palette is ever extended:
   `--accent-ink`, large type uses it too.
 - **The ochre button takes ink-coloured labels, not white.** Dark on mustard is
   6.96:1; white on mustard is 3.76:1 and fails.
+- **Type on the wood is checked against the lightest band of the grain, not
+  the average.** A board is not one colour. `node tools/check-texture-contrast.mjs`
+  samples the baked textures and reports the worst pixel; it reads the palette
+  out of `globals.css`, so it cannot drift out of date. Run it after changing
+  either the texture or the palette.
 
 Also: skip link, visible focus rings, one `h1` per page with no skipped
 heading levels, labelled form fields, and `prefers-reduced-motion` honoured.
