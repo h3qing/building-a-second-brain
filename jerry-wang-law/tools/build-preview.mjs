@@ -84,6 +84,13 @@ const routeSections = ROUTES.map((route) => {
 }).join("\n");
 body = body.replace(/<main id="main">[\s\S]*?<\/main>/, `<main id="main">\n${routeSections}\n</main>`);
 
+/* A hosted preview cannot frame other sites, so the map becomes a link to
+   the same place. The live site keeps the embed. */
+body = body.replace(/<iframe class="contact__map"[^>]*src="([^"]+)"[^>]*><\/iframe>/, (_, src) => {
+  const href = src.replace(/&(?:amp;)?output=embed/, "");
+  return `<a class="contact__map contact__map--link" href="${href}" target="_blank" rel="noreferrer"><span>Map — opens in Google Maps</span></a>`;
+});
+
 const previewCss = `
 /* ---- preview-only ------------------------------------------------------ */
 .reveal { opacity: 1; transform: none; }          /* the page at rest, no observer */
@@ -95,6 +102,11 @@ const previewCss = `
   background: var(--ink); color: var(--paper); opacity: 0.85;
 }
 @media (max-width: 52rem) { .preview-note { bottom: 4.6rem; } }
+.contact__map--link {
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: 1rem; text-decoration: none; background: var(--paper-2);
+  font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent-ink);
+}
 `;
 
 const script = `
