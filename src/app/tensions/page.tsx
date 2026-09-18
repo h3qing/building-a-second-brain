@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getTensions } from "@/lib/tensions";
+import { OutboundLink } from "@/app/components/outbound-link";
 
 export const dynamic = "force-dynamic";
 
@@ -66,16 +67,14 @@ export default async function TensionsPage() {
                     const className =
                       "inline-flex items-center gap-1.5 text-xs px-2.5 py-1 border border-border rounded-sm text-muted font-mono";
                     return s.url ? (
-                      <a
+                      <OutboundLink
                         key={s.name}
                         href={s.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
                         className={`${className} hover:text-foreground hover:border-foreground transition-colors`}
                       >
                         <span>{icon}</span>
                         <span>{s.name}</span>
-                      </a>
+                      </OutboundLink>
                     ) : (
                       <span key={s.name} className={className}>
                         <span>{icon}</span>

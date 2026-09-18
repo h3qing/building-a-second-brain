@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { findConceptBySlug } from "@/lib/content";
-import { formatDate } from "@/lib/time";
+import { formatDate, toISODate } from "@/lib/time";
+import { ContentViewTracker } from "@/app/components/content-view-tracker";
 
 export default async function ConceptPage({
   params,
@@ -17,6 +18,15 @@ export default async function ConceptPage({
 
   return (
     <div className="space-y-6">
+      <ContentViewTracker
+        content_id={`concepts/${slug}`}
+        content_type="note"
+        content_title={title}
+        content_published_at={
+          toISODate(frontmatter.reviewed_date) ??
+          toISODate(frontmatter.last_updated)
+        }
+      />
       <div>
         <Link
           href="/"
