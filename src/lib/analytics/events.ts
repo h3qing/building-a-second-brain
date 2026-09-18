@@ -6,7 +6,7 @@
  * this union does not compile.
  */
 
-export type AppName = 'blog' | 'second_brain' | 'influence' | 'megaphone'
+export type AppName = 'blog' | 'second_brain' | 'megaphone'
 
 export type AppEnv = 'production' | 'preview' | 'development'
 
