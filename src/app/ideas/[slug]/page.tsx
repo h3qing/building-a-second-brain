@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { findIdeaBySlug } from "@/lib/content";
+import { toISODate } from "@/lib/time";
+import { ContentViewTracker } from "@/app/components/content-view-tracker";
 
 export default async function IdeaPage({
   params,
@@ -21,6 +23,12 @@ export default async function IdeaPage({
 
   return (
     <div className="space-y-6">
+      <ContentViewTracker
+        content_id={`ideas/${slug}`}
+        content_type="note"
+        content_title={title}
+        content_published_at={toISODate(frontmatter.reviewed_date)}
+      />
       <div>
         <Link
           href="/"
