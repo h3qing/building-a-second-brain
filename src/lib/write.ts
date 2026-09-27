@@ -1,13 +1,10 @@
 import { listFiles, getFilesContent } from "./github";
 import { parseFrontmatter, extractTitle } from "./parser";
 import { extractSection, firstParagraph } from "./markdown";
+import { slugify, ideaHref, writeHref } from "./slug";
 
 const WIKILINK_RE = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
 const READY_THRESHOLD = 3;
-
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-}
 
 interface ConceptMeta {
   title: string;
@@ -87,7 +84,7 @@ async function buildBacklinks(): Promise<{
     const ref: IdeaRef = {
       title: extractTitle(content, path),
       slug: slugify(filename),
-      url: `/ideas/${slugify(filename)}`,
+      url: ideaHref(slugify(filename)),
       insight: extractSection(content, "Insight"),
       source:
         typeof frontmatter.source === "string"
@@ -127,7 +124,7 @@ export async function getWritableConcepts(
     out.push({
       concept: meta.title,
       slug,
-      url: `/write/${slug}`,
+      url: writeHref(slug),
       definition: meta.definition,
       ideaCount: ideas.length,
       tags: meta.tags,

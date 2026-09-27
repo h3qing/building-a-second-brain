@@ -26,8 +26,9 @@ const SOURCE_LABEL: Record<string, [string, string]> = {
 
 // The idea's life story: source → captured → first review → last review → next
 // due. Dates come from frontmatter; the first-review date is recovered from
-// the `review: …` commit trail (same data the stats heatmap uses); "captured"
-// comes from the source note's date_ingested. Async — render inside Suspense.
+// this file's own `review: …` commits (its full history, however old);
+// "captured" comes from the source note's date_ingested. Async — render inside
+// Suspense.
 export async function IdeaJourney({
   path,
   frontmatter,
@@ -47,7 +48,7 @@ export async function IdeaJourney({
     typeof frontmatter.source_type === "string" ? frontmatter.source_type : "";
 
   const [commits, sourceFile] = await Promise.all([
-    listCommits().catch(() => []),
+    listCommits({ path }).catch(() => []),
     // Shared resolver: handles both full-path and bare-filename wikilinks.
     resolveSourceFile(frontmatter).catch(() => null),
   ]);
@@ -56,7 +57,7 @@ export async function IdeaJourney({
     ? toISODate(parseFrontmatter(sourceFile.content).frontmatter.date_ingested)
     : undefined;
 
-  // Commits arrive newest-first, so the last matching event is the first review.
+  // Commits arrive newest-first, so the last review event is the first review.
   const firstReviewDate = parseReviewEvents(commits)
     .filter((e) => e.slug === slug)
     .map((e) => e.date)

@@ -1,6 +1,7 @@
 import { listFiles, getFilesContent } from "./github";
 import { parseFrontmatter, extractTitle } from "./parser";
 import { extractSection, firstParagraph } from "./markdown";
+import { slugify, conceptHref } from "./slug";
 
 // A source (book or podcast) that feeds a concept, derived from the idea notes
 // that cite it. Podcasts carry an episode URL when one is available.
@@ -19,10 +20,6 @@ export interface Tension {
   text: string;
   tags: string[];
   sources: TensionSource[];
-}
-
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
 const WIKILINK_RE = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
@@ -109,7 +106,7 @@ export async function getTensions(): Promise<Tension[]> {
     out.push({
       concept: extractTitle(content, path),
       slug,
-      url: `/concepts/${slug}`,
+      url: conceptHref(slug),
       definition: firstParagraph(content),
       text,
       tags: Array.isArray(frontmatter.tags)

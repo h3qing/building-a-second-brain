@@ -6,6 +6,7 @@ import {
   recapAuth,
   renderDigest,
 } from "@/lib/recap";
+import { todayISO } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
   }
 
   const items = await getRecallItems();
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayISO();
   const due = dueItems(items, today);
 
   // Rediscover: reviewed items you've internalized but that aren't due today.

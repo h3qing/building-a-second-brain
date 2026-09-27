@@ -1,6 +1,8 @@
 import { timingSafeEqual } from "crypto";
 import { listFiles, getFilesContent } from "./github";
 import { parseFrontmatter, extractTitle } from "./parser";
+import { slugify, conceptHref, ideaHref } from "./slug";
+import { toISODate } from "./time";
 
 // A single recall-able knowledge item (idea or concept) with its
 // spaced-repetition state, shaped for the Recall API.
@@ -16,11 +18,6 @@ export interface RecallItem {
   reviewCount: number | null;
   nextReviewDate: string | null;
   difficulty: string | null;
-}
-
-// Mirrors the slug rule in lib/content.ts so URLs match the rendered pages.
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
 // First prose paragraph (a concept's definition, or an idea's insight),
@@ -69,7 +66,7 @@ export async function getRecallItems(): Promise<RecallItem[]> {
       type: isIdea ? "idea" : "concept",
       title: extractTitle(content, path),
       slug,
-      url: isIdea ? `/ideas/${slug}` : `/concepts/${slug}`,
+      url: isIdea ? ideaHref(slug) : conceptHref(slug),
       source,
       excerpt: firstParagraph(content),
       tags: Array.isArray(frontmatter.tags) ? (frontmatter.tags as string[]) : [],
@@ -78,10 +75,8 @@ export async function getRecallItems(): Promise<RecallItem[]> {
         typeof frontmatter.review_count === "number"
           ? frontmatter.review_count
           : null,
-      nextReviewDate:
-        typeof frontmatter.next_review_date === "string"
-          ? frontmatter.next_review_date
-          : null,
+      // Unquoted YAML dates parse as Date objects — normalize like the queue.
+      nextReviewDate: toISODate(frontmatter.next_review_date) ?? null,
       difficulty:
         typeof frontmatter.difficulty === "string"
           ? frontmatter.difficulty

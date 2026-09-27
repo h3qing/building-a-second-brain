@@ -1,7 +1,8 @@
 import { listCommits, type CommitSummary } from "./github";
+import { addDaysISO, localISODate, todayISO } from "./time";
 
 export interface ReviewEvent {
-  date: string; // YYYY-MM-DD (UTC)
+  date: string; // YYYY-MM-DD, in APP_TIMEZONE
   slug: string;
   action: "approve" | "contest" | "easy" | "medium" | "hard";
 }
@@ -33,7 +34,8 @@ export function parseReviewEvents(commits: CommitSummary[]): ReviewEvent[] {
     const m = firstLine.match(REVIEW_RE);
     if (!m) continue;
     events.push({
-      date: c.date.slice(0, 10),
+      // The reader's calendar day, not UTC's (see APP_TIMEZONE).
+      date: localISODate(new Date(c.date)),
       slug: m[2],
       action: m[1].toLowerCase() as ReviewEvent["action"],
     });
@@ -54,17 +56,10 @@ function uniqueSlugsByDay(events: ReviewEvent[]): Map<string, Set<string>> {
   return byDay;
 }
 
-function addDays(iso: string, delta: number): string {
-  const d = new Date(iso + "T00:00:00Z");
-  d.setUTCDate(d.getUTCDate() + delta);
-  return d.toISOString().slice(0, 10);
-}
-
-function todayUTC(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function computeStreak(byDay: Map<string, Set<string>>): {
+function computeStreak(
+  byDay: Map<string, Set<string>>,
+  today: string
+): {
   current: number;
   longest: number;
   lastDate: string | null;
@@ -75,7 +70,7 @@ function computeStreak(byDay: Map<string, Set<string>>): {
   let longest = 1;
   let run = 1;
   for (let i = 1; i < dates.length; i++) {
-    if (addDays(dates[i - 1], 1) === dates[i]) {
+    if (addDaysISO(dates[i - 1], 1) === dates[i]) {
       run += 1;
       longest = Math.max(longest, run);
     } else {
@@ -83,14 +78,13 @@ function computeStreak(byDay: Map<string, Set<string>>): {
     }
   }
 
-  const today = todayUTC();
   const lastDate = dates[dates.length - 1];
   let current = 0;
   // Grace window: allow today to be empty (haven't reviewed yet today).
-  if (lastDate === today || lastDate === addDays(today, -1)) {
+  if (lastDate === today || lastDate === addDaysISO(today, -1)) {
     current = 1;
     for (let i = dates.length - 2; i >= 0; i--) {
-      if (addDays(dates[i], 1) === dates[i + 1]) {
+      if (addDaysISO(dates[i], 1) === dates[i + 1]) {
         current += 1;
       } else {
         break;
@@ -109,20 +103,24 @@ function bucketLevel(count: number): HeatmapCell["level"] {
   return 4;
 }
 
-// 52-week × 7-day grid ending today, Sunday-start columns, UTC.
-function buildHeatmap(byDay: Map<string, Set<string>>): {
+// First/last day of the 52-week × 7-day grid ending this week (Sunday-start
+// columns). Pure calendar math on YYYY-MM-DD strings.
+function heatmapBounds(today: string): { start: string; end: string } {
+  const dow = new Date(today + "T00:00:00Z").getUTCDay(); // 0 = Sun
+  const end = addDaysISO(today, 6 - dow);
+  return { start: addDaysISO(end, -(52 * 7 - 1)), end };
+}
+
+function buildHeatmap(
+  byDay: Map<string, Set<string>>,
+  today: string
+): {
   weeks: HeatmapCell[][];
   start: string;
   end: string;
 } {
-  const end = todayUTC();
-  const endDate = new Date(end + "T00:00:00Z");
-  const endDow = endDate.getUTCDay(); // 0 = Sun
-  const daysToSat = 6 - endDow;
-  const gridEnd = new Date(endDate);
-  gridEnd.setUTCDate(gridEnd.getUTCDate() + daysToSat);
-  const gridStart = new Date(gridEnd);
-  gridStart.setUTCDate(gridStart.getUTCDate() - (52 * 7 - 1));
+  const bounds = heatmapBounds(today);
+  const gridStart = new Date(bounds.start + "T00:00:00Z");
 
   const weeks: HeatmapCell[][] = [];
   const cursor = new Date(gridStart);
@@ -130,7 +128,7 @@ function buildHeatmap(byDay: Map<string, Set<string>>): {
     const week: HeatmapCell[] = [];
     for (let d = 0; d < 7; d++) {
       const iso = cursor.toISOString().slice(0, 10);
-      const isFuture = iso > end;
+      const isFuture = iso > today;
       const count = isFuture ? 0 : byDay.get(iso)?.size ?? 0;
       week.push({ date: iso, count, level: isFuture ? 0 : bucketLevel(count) });
       cursor.setUTCDate(cursor.getUTCDate() + 1);
@@ -138,25 +136,29 @@ function buildHeatmap(byDay: Map<string, Set<string>>): {
     weeks.push(week);
   }
 
-  return {
-    weeks,
-    start: gridStart.toISOString().slice(0, 10),
-    end: gridEnd.toISOString().slice(0, 10),
-  };
+  return { weeks, start: bounds.start, end: bounds.end };
 }
 
+// Everything here covers the heatmap's 52 weeks — the window whose commits are
+// fetched. Fetching starts a day early so a timezone ahead of UTC doesn't clip
+// the first local day; events before the window are then dropped.
 export async function getReviewStats(): Promise<ReviewStatsData> {
-  const commits = await listCommits();
-  const events = parseReviewEvents(commits);
+  const today = todayISO();
+  const grid = heatmapBounds(today);
+  const commits = await listCommits({
+    since: `${addDaysISO(grid.start, -1)}T00:00:00Z`,
+  });
+  const events = parseReviewEvents(commits).filter(
+    (e) => e.date >= grid.start
+  );
   const byDay = uniqueSlugsByDay(events);
 
   const totalUnique = new Set(events.map((e) => e.slug)).size;
   const approves = events.filter((e) => e.action === "approve").length;
   const contests = events.filter((e) => e.action === "contest").length;
 
-  const today = todayUTC();
-  const weekAgo = addDays(today, -6);
-  const monthAgo = addDays(today, -29);
+  const weekAgo = addDaysISO(today, -6);
+  const monthAgo = addDaysISO(today, -29);
 
   let reviewsThisWeek = 0;
   let reviewsThisMonth = 0;
@@ -171,7 +173,7 @@ export async function getReviewStats(): Promise<ReviewStatsData> {
     contests,
     reviewsThisWeek,
     reviewsThisMonth,
-    streak: computeStreak(byDay),
-    heatmap: buildHeatmap(byDay),
+    streak: computeStreak(byDay, today),
+    heatmap: buildHeatmap(byDay, today),
   };
 }

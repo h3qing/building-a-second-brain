@@ -12,6 +12,7 @@ import {
   type Difficulty,
 } from "@/lib/parser";
 import { applyReviewToQueueCache } from "@/lib/review-queue";
+import { todayISO } from "@/lib/time";
 
 export async function reviewAction(formData: FormData) {
   const isLoggedIn = await verifySession();
@@ -27,7 +28,7 @@ export async function reviewAction(formData: FormData) {
 
   if (!path || !action) redirect("/review");
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayISO();
 
   const srActions: Difficulty[] = ["easy", "medium", "hard"];
   const isSR = srActions.includes(action as Difficulty);

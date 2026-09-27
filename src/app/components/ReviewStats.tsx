@@ -95,7 +95,7 @@ export async function ReviewStats() {
           >
             {totalUnique}
           </div>
-          <div className="label mt-1.5">total ideas</div>
+          <div className="label mt-1.5">ideas · 52 wk</div>
         </div>
       </div>
 

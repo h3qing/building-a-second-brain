@@ -157,35 +157,97 @@ export interface CommitSummary {
   date: string; // ISO timestamp from author.date
 }
 
-let commitCache: { commits: CommitSummary[]; fetchedAt: number } | null = null;
+export interface CommitFilter {
+  since?: string; // ISO timestamp — only commits after it
+  path?: string; // only commits touching this file
+}
+
 const COMMIT_CACHE_TTL = 5 * 60_000; // 5 min
+const COMMITS_PER_PAGE = 100;
+// Every in-app review is its own commit, so a year of daily reviewing runs to
+// thousands. This caps what one refresh can cost (10k commits).
+const MAX_COMMIT_PAGES = 100;
+const COMMIT_PAGE_CONCURRENCY = 10;
 
-// Fetch recent commits, paginating up to `maxPages` * 100 items.
-export async function listCommits(maxPages = 5): Promise<CommitSummary[]> {
+const commitCache = new Map<
+  string,
+  { commits: CommitSummary[]; fetchedAt: number }
+>();
+
+type CommitPage = { commits: CommitSummary[]; lastPage: number };
+
+async function fetchCommitPage(
+  query: URLSearchParams,
+  page: number
+): Promise<CommitPage | null> {
+  const params = new URLSearchParams(query);
+  params.set("page", String(page));
+  const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits?${params}`;
+  const res = await fetch(url, { headers: headers(), cache: "no-store" });
+  if (!res.ok) return null;
+  const data = (await res.json()) as Array<{
+    commit: { message: string; author: { date: string } };
+  }>;
+  // rel="last" names the final page; it's absent when this is the only page.
+  const last = res.headers
+    .get("link")
+    ?.match(/[?&]page=(\d+)[^>]*>;\s*rel="last"/);
+  return {
+    commits: data.map((item) => ({
+      message: item.commit.message,
+      date: item.commit.author.date,
+    })),
+    lastPage: last ? parseInt(last[1], 10) : page,
+  };
+}
+
+// Commits on main matching `filter`, newest first. Page 1's Link header gives
+// the page count, so the rest load in parallel batches instead of one by one —
+// the old fixed 5-page walk silently dropped everything past the newest 500
+// commits, which is only a few weeks of reviews.
+export async function listCommits(
+  filter: CommitFilter = {}
+): Promise<CommitSummary[]> {
+  const key = JSON.stringify(filter);
+  const cached = commitCache.get(key);
   const now = Date.now();
-  if (commitCache && now - commitCache.fetchedAt < COMMIT_CACHE_TTL) {
-    return commitCache.commits;
+  if (cached && now - cached.fetchedAt < COMMIT_CACHE_TTL) {
+    return cached.commits;
   }
 
-  const all: CommitSummary[] = [];
-  for (let page = 1; page <= maxPages; page++) {
-    const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits?sha=${BRANCH}&per_page=100&page=${page}`;
-    const res = await fetch(url, { headers: headers(), cache: "no-store" });
-    if (!res.ok) break;
-    const data = (await res.json()) as Array<{
-      commit: { message: string; author: { date: string } };
-    }>;
-    if (data.length === 0) break;
-    for (const item of data) {
-      all.push({
-        message: item.commit.message,
-        date: item.commit.author.date,
-      });
+  const query = new URLSearchParams({
+    sha: BRANCH,
+    per_page: String(COMMITS_PER_PAGE),
+  });
+  if (filter.since) query.set("since", filter.since);
+  if (filter.path) query.set("path", filter.path);
+
+  const first = await fetchCommitPage(query, 1);
+  if (!first) return cached?.commits ?? [];
+
+  const all = [...first.commits];
+  const lastPage = Math.min(first.lastPage, MAX_COMMIT_PAGES);
+  batches: for (
+    let page = 2;
+    page <= lastPage;
+    page += COMMIT_PAGE_CONCURRENCY
+  ) {
+    const pageNumbers = Array.from(
+      { length: Math.min(COMMIT_PAGE_CONCURRENCY, lastPage - page + 1) },
+      (_, i) => page + i
+    );
+    const results = await Promise.all(
+      pageNumbers.map((n) => fetchCommitPage(query, n))
+    );
+    // Keep history contiguous: stop at the first failed page rather than
+    // stitching around a gap.
+    for (const result of results) {
+      if (!result) break batches;
+      all.push(...result.commits);
     }
-    if (data.length < 100) break;
   }
 
-  commitCache = { commits: all, fetchedAt: now };
+  commitCache.set(key, { commits: all, fetchedAt: now });
   return all;
 }
 
