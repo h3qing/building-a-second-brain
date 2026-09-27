@@ -1,6 +1,7 @@
 import { listFiles, getFilesContent } from "./github";
 import { parseFrontmatter, extractTitle } from "./parser";
 import { toISODate, todayISO } from "./time";
+import { slugify } from "./slug";
 
 export interface GraphNode {
   id: string;
@@ -130,10 +131,6 @@ export function filterGraph(data: FilteredGraph, query: string): FilteredGraph {
   });
 
   return { nodes, links };
-}
-
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
 // "[[The Obstacle Is the Way - Holiday]]" -> "The Obstacle Is the Way - Holiday".

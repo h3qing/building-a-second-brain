@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { findIdeaBySlug } from "@/lib/content";
 import { toISODate } from "@/lib/time";
+import { decodeSlug } from "@/lib/slug";
 import { ContentViewTracker } from "@/app/components/content-view-tracker";
 
 export default async function IdeaPage({
@@ -9,7 +10,7 @@ export default async function IdeaPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { slug } = await params;
+  const slug = decodeSlug((await params).slug);
   const idea = await findIdeaBySlug(slug);
 
   if (!idea) notFound();

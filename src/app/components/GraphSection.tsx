@@ -17,6 +17,7 @@ import {
   type FilteredGraph,
   type GraphNode,
 } from "@/lib/graph";
+import { conceptHref, ideaHref } from "@/lib/slug";
 
 // The 3D renderer (and three.js) loads only when the user switches to 3D, so it
 // never weighs down the default 2D view.
@@ -144,9 +145,9 @@ export default function GraphSection({ data }: { data: FilteredGraph }) {
       if (node.type === "writing") {
         if (node.url) window.open(node.url, "_blank", "noopener,noreferrer");
       } else if (node.type === "concept") {
-        router.push(`/concepts/${node.slug}`);
+        router.push(conceptHref(node.slug));
       } else {
-        router.push(`/ideas/${node.slug}`);
+        router.push(ideaHref(node.slug));
       }
     },
     [router]

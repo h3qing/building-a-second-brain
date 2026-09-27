@@ -1,6 +1,12 @@
 import { listFiles, getFilesContent } from "./github";
-import { parseFrontmatter, extractTitle, computeNextInterval, type Difficulty } from "./parser";
-import { toISODate } from "./time";
+import {
+  parseFrontmatter,
+  extractTitle,
+  computeNextInterval,
+  elapsedSince,
+  type Difficulty,
+} from "./parser";
+import { toISODate, addDaysISO } from "./time";
 
 export interface QueueItem {
   path: string;
@@ -208,9 +214,12 @@ export function applyReviewToQueueCache(
       item.nextReviewDate = addDaysISO(today, 1);
     }
   } else if (action === "easy" || action === "medium" || action === "hard") {
+    // Same schedule as the committed file: elapsed is measured from the
+    // previous review, before this one overwrites reviewedDate below.
     const nextInterval = computeNextInterval(
       item.reviewInterval || 1,
-      action as Difficulty
+      action as Difficulty,
+      elapsedSince(item.reviewedDate, today)
     );
     item.status = "reviewed";
     item.reviewedDate = today;
@@ -233,12 +242,6 @@ export function applyReviewToQueueCache(
     isContest: action === "contest",
     at: Date.now(),
   });
-}
-
-function addDaysISO(iso: string, days: number): string {
-  return new Date(Date.parse(iso + "T00:00:00Z") + days * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
 }
 
 // The ordered list a card belongs to, used to find its prev/next during review.

@@ -1,5 +1,6 @@
 import { listFiles, getFileViaTree } from "./github";
 import { parseFrontmatter, extractTitle } from "./parser";
+import { slugify, conceptHref, ideaHref } from "./slug";
 import { remark } from "remark";
 import remarkGfm from "remark-gfm";
 import remarkRehype from "remark-rehype";
@@ -24,10 +25,6 @@ const sanitizeSchema: Schema = {
     ),
   },
 };
-
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-}
 
 export interface FileEntry {
   path: string;
@@ -77,10 +74,10 @@ function resolveWikilinks(
       if (!entry) return display;
 
       if (entry.path.startsWith("30 Concept/")) {
-        return `<a href="/concepts/${entry.slug}" class="wikilink">${display}</a>`;
+        return `<a href="${conceptHref(entry.slug)}" class="wikilink">${display}</a>`;
       }
       if (entry.path.startsWith("20 Ideas/")) {
-        return `<a href="/ideas/${entry.slug}" class="wikilink">${display}</a>`;
+        return `<a href="${ideaHref(entry.slug)}" class="wikilink">${display}</a>`;
       }
 
       return display;

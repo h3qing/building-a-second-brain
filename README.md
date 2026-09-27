@@ -99,6 +99,7 @@ GITHUB_REPO_OWNER=your-username
 GITHUB_REPO_NAME=your-vault-repo
 AUTH_PIN_HASH=$2b$10$...          # node -e "require('bcryptjs').hash('your-pin', 10).then(console.log)"
 REVALIDATE_SECRET=your-secret
+APP_TIMEZONE=America/Los_Angeles  # optional: your IANA timezone for review dates/streaks (default UTC)
 ```
 
 The app reads your vault's `main` branch live via the GitHub API and renders it per-request — merge a sync PR and the site updates. Public pages show the graph; `/review` is PIN-gated for you.

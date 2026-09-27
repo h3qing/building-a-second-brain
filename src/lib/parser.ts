@@ -1,5 +1,6 @@
 import matter from "gray-matter";
 import { getFileViaTree } from "./github";
+import { addDaysISO, daysBetween, toISODate } from "./time";
 
 export interface SourceContext {
   quote: string;
@@ -223,18 +224,35 @@ const DIFFICULTY_MULTIPLIER: Record<Difficulty, number> = {
 
 const MAX_INTERVAL = 180;
 
+// Growth is earned by recalling after the full interval. A card opened early
+// (from the Reviewed list, before it's due) only proves recall after
+// `elapsedDays`, so the multiplier applies to that — otherwise rating a 30-day
+// card "easy" the day after its last review jumped it to 90 days. Early
+// reviews never shrink the interval either. On-time and overdue reviews
+// (elapsed >= interval) scale the interval exactly as before.
 export function computeNextInterval(
   currentInterval: number,
-  difficulty: Difficulty
+  difficulty: Difficulty,
+  elapsedDays?: number
 ): number {
-  const next = currentInterval * DIFFICULTY_MULTIPLIER[difficulty];
+  const earned =
+    elapsedDays === undefined
+      ? currentInterval
+      : Math.min(currentInterval, Math.max(0, elapsedDays));
+  const next = Math.max(
+    currentInterval,
+    earned * DIFFICULTY_MULTIPLIER[difficulty]
+  );
   return Math.min(next, MAX_INTERVAL);
 }
 
-function addDays(dateStr: string, days: number): string {
-  const date = new Date(dateStr + "T00:00:00");
-  date.setDate(date.getDate() + days);
-  return date.toISOString().split("T")[0];
+// Days since the last review, or undefined when there's no usable date.
+export function elapsedSince(
+  lastReviewed: unknown,
+  today: string
+): number | undefined {
+  const last = toISODate(lastReviewed);
+  return last ? daysBetween(last, today) : undefined;
 }
 
 export function updateReviewStatus(
@@ -253,7 +271,7 @@ export function updateReviewStatus(
   if (status === "reviewed" && !data.review_count) {
     updated.review_count = 1;
     updated.review_interval = 1;
-    updated.next_review_date = addDays(date, 1);
+    updated.next_review_date = addDaysISO(date, 1);
   }
 
   return matter.stringify(content, updated);
@@ -276,7 +294,11 @@ export function updateSpacedRepetition(
   const { data, content } = matter(rawContent);
   const currentInterval = (data.review_interval as number) || 1;
   const currentCount = (data.review_count as number) || 1;
-  const nextInterval = computeNextInterval(currentInterval, difficulty);
+  const nextInterval = computeNextInterval(
+    currentInterval,
+    difficulty,
+    elapsedSince(data.reviewed_date, date)
+  );
 
   const updated = {
     ...data,
@@ -284,7 +306,7 @@ export function updateSpacedRepetition(
     reviewed_date: date,
     review_count: currentCount + 1,
     review_interval: nextInterval,
-    next_review_date: addDays(date, nextInterval),
+    next_review_date: addDaysISO(date, nextInterval),
     difficulty,
   };
 

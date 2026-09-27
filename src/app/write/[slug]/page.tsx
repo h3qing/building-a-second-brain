@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getWritingBrief, renderBriefMarkdown } from "@/lib/write";
+import { decodeSlug } from "@/lib/slug";
 import { CopyBriefButton } from "./copy-button";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,7 @@ export default async function BriefPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { slug } = await params;
+  const slug = decodeSlug((await params).slug);
   const brief = await getWritingBrief(slug);
   if (!brief) notFound();
 

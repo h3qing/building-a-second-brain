@@ -5,6 +5,7 @@ import { verifySession } from "@/lib/auth";
 import { getFileContent } from "@/lib/github";
 import { parseReviewItem } from "@/lib/parser";
 import { getReviewQueue, queueForCard, cardHref } from "@/lib/review-queue";
+import { todayISO } from "@/lib/time";
 import { ReviewCardForm } from "./insight-editor";
 import { IdeaJourney } from "./journey";
 import { SourceCard } from "./source-card";
@@ -57,7 +58,7 @@ export default async function CardReview({
   // Recompute the queue server-side to find this card's neighbours, so the
   // session flows through the whole queue instead of bouncing back to /review
   // after one card (the URL no longer carries the next/prev hops).
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayISO();
   const navMode = isReReview ? "rereview" : params.mode;
   const queue = queueForCard(await getReviewQueue(), currentPath, navMode, today);
   const idx = queue.findIndex((i) => i.path === currentPath);

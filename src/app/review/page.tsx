@@ -6,7 +6,7 @@ import {
   cardHref,
   type QueueItem,
 } from "@/lib/review-queue";
-import { spanLabel, daysBetween, timeUntil } from "@/lib/time";
+import { spanLabel, daysBetween, timeUntil, todayISO } from "@/lib/time";
 import { ReviewStats } from "@/app/components/ReviewStats";
 import { reviewAction } from "@/app/review/action";
 import { StarredFilter } from "./starred-filter";
@@ -172,7 +172,7 @@ function CardSection({
 export default async function ReviewQueue() {
   const isLoggedIn = await verifySession();
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayISO();
   const allItems = await getReviewQueue(true);
   const { unreviewed, contested, reviewed, dueForReview } = categorize(
     allItems,
@@ -191,12 +191,20 @@ export default async function ReviewQueue() {
   const backWhen = (item: QueueItem) =>
     item.nextReviewDate ? `back ${timeUntil(item.nextReviewDate, today)}` : null;
 
-  const startHref = isLoggedIn
-    ? unreviewed.length > 0
-      ? cardHref(unreviewed[0].path)
-      : null
-    : "/login";
-  const startCta = isLoggedIn ? "Start Reviewing" : "Sign in to review";
+  // Due re-reviews come first: they're fading right now, while new ideas can
+  // wait a day. With nothing due, the button starts on the new ones.
+  const startHref = !isLoggedIn
+    ? "/login"
+    : dueForReview.length > 0
+      ? cardHref(dueForReview[0].path, "rereview")
+      : unreviewed.length > 0
+        ? cardHref(unreviewed[0].path)
+        : null;
+  const startCta = !isLoggedIn
+    ? "Sign in to review"
+    : dueForReview.length > 0
+      ? `Review ${dueForReview.length} due`
+      : "Start Reviewing";
 
   return (
     <div className="space-y-10">
@@ -288,7 +296,8 @@ export default async function ReviewQueue() {
         </div>
       ) : (
         unreviewed.length === 0 &&
-        contested.length === 0 && (
+        contested.length === 0 &&
+        dueForReview.length === 0 && (
           <div className="text-center py-16 text-muted">
             <p className="text-lg mb-2">All caught up.</p>
             <p className="text-sm">
