@@ -54,7 +54,7 @@ This is a system. It's not a read-later app and not a note-taking app — it's a
 
 1. **Capture** — Drop a URL, a file, or a thought to Claude Code. It fetches the full content into an immutable `10 Notes/` source (Kindle highlights, YouTube transcripts via `yt-dlp`, articles as markdown).
 2. **Extract** — An LLM reads the source and pulls out as many atomic ideas as it genuinely warrants (a dense book may yield fifteen, a thin article two) — one idea per file, each with a direct quote or timestamp back to the original.
-3. **Review** — Every AI idea lands `unreviewed`. You approve, contest, or edit. Approved ideas enter a Leitner spaced-repetition cycle (Easy 3× / Medium 2× / Hard 1× interval scaling, capped at 180 days).
+3. **Review** — Every AI idea lands `unreviewed`. You approve, contest, or edit. Approved ideas enter a Leitner spaced-repetition cycle (Easy 3× / Medium 2× / Hard 1× interval scaling, capped at 180 days; **Forgot** resets a card to tomorrow). Early reviews can't inflate an interval, and overdue recalls get credit for the extra days. A daily session runs every due card first, then a capped number of new ideas.
 4. **Synthesize** — Ideas link into lean concept hub-nodes: a one-sentence definition, the tensions between sources, links to related concepts. Every author, host, and guest also gets a person hub-node in `50 People/` — a second network over the graph: who wrote what, who interviewed whom, which thinkers cluster together.
 5. **Write** — Original essays in your voice, informed by the concept graph but never generated from it.
 
@@ -100,6 +100,7 @@ GITHUB_REPO_NAME=your-vault-repo
 AUTH_PIN_HASH=$2b$10$...          # node -e "require('bcryptjs').hash('your-pin', 10).then(console.log)"
 REVALIDATE_SECRET=your-secret
 APP_TIMEZONE=America/Los_Angeles  # optional: your IANA timezone for review dates/streaks (default UTC)
+DAILY_NEW_LIMIT=10                # optional: new ideas per daily session (default 10)
 ```
 
 The app reads your vault's `main` branch live via the GitHub API and renders it per-request — merge a sync PR and the site updates. Public pages show the graph; `/review` is PIN-gated for you.
@@ -139,7 +140,7 @@ Books / Articles / Podcasts
 | `/` | Public | Knowledge graph, pipeline diagram, activity feed |
 | `/concepts/[slug]` | Public | Rendered concept page with wikilinks |
 | `/ideas/[slug]` | Public | Rendered idea page with source context |
-| `/review` | Private | Review queue dashboard |
+| `/review` | Private | Review queue dashboard: today's session (due first, then new), a 7-day due forecast, activity heatmap |
 | `/review/card` | Private | Card-based review with **active recall** (insight hidden until you reveal it) |
 | `/write` | Public | Concepts you've reviewed enough to write about |
 | `/write/[slug]` | Public | A writing brief: definition, tension, prompt, and source material |
@@ -150,7 +151,7 @@ Books / Articles / Podcasts
 Collecting is the easy half. These close the loop to thinking and writing:
 
 - **Writing briefs (`/write`).** A concept becomes "ready to write" once enough reviewed ideas link to it. Open one and you get the definition, the cross-source tension, a synthesized prompt, and every linked idea (insight + quote), assembled to draft from. Copy as markdown or pull it via API.
-- **Active recall (`/review/card`).** Re-reviews hide the insight behind a Reveal button, so you recall it before checking yourself, then rate how well you did (which sets the next spaced-repetition interval). Real recall, not passive re-reading.
+- **Active recall (`/review/card`).** Re-reviews hide the insight behind a Reveal button, so you recall it before checking yourself, then rate how well you did: Easy / Medium / Hard / Forgot, each button showing when the card would come back. Ideas carry a `## Recall` question written at extraction; the card asks it and hides everything that gives the answer away (title, highlight, source quote) until you reveal. Real recall, not passive re-reading.
 - **Tensions (`/tensions`).** A feed of concepts whose sources disagree. Taking a side is how reading turns into writing.
 
 ## API

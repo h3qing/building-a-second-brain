@@ -103,6 +103,11 @@ export function timeUntil(iso: string, today: string): string {
   return `in ${spanLabel(d)}`;
 }
 
+// Compact interval for rating buttons: "1d", "12d", "3mo".
+export function shortSpan(days: number): string {
+  return days < 60 ? `${days}d` : `${Math.round(days / 30)}mo`;
+}
+
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",

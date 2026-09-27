@@ -16,6 +16,10 @@ tags: [Strategy, focus, byproduct, liang-wenfeng, deepseek]
 
 DeepSeek 不抢 C 端流量、不把 B 端收入当目标，因为眼前的机会只是芝麻，AGI 才是西瓜；C 端和 B 端都是做 AGI 的中间产出，站在技术高位顺手商业化，构成降维打击。
 
+## Recall
+
+DeepSeek 为什么不去抢 C 端流量，也不把 B 端收入当目标？
+
 ## Source Context
 
 > 但是我们选择是一种非常克制的做法，就是我不跟你去争这个东西，因为后面还有西瓜，前面的可能都是芝麻。

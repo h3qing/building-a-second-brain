@@ -16,6 +16,10 @@ tags: [AI, agi-roadmap, continual-learning, liang-wenfeng, deepseek]
 
 梁文锋把 AI 进展描述为阶梯：语言模型、CoT、Agent 逐级搭建，每一级都会走到能力上限；站在 Agent 这一级能看到的下一个瓶颈是持续学习，其后是渐进而非突变的自我迭代奇点，最后才是具身智能。
 
+## Recall
+
+按梁文锋的“阶梯”比喻，站在 Agent 这一级，能看到的下一个瓶颈是什么？
+
 ## Source Context
 
 > AI的发展，我们可以理解成它是一个阶梯。去年走的阶梯是CoT，就是思维链。

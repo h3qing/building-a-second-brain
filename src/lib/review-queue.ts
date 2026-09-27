@@ -18,6 +18,8 @@ export interface QueueItem {
   reviewCount?: number;
   reviewedDate?: string;
   reviewInterval?: number;
+  difficulty?: string; // last rating: easy | medium | hard | forgot
+  lapses?: number;
   starred?: boolean;
 }
 
@@ -45,6 +47,8 @@ interface ReviewPatch {
   reviewCount?: number;
   reviewInterval?: number;
   nextReviewDate?: string;
+  difficulty?: string;
+  lapses?: number;
   isContest: boolean;
   at: number;
 }
@@ -83,6 +87,8 @@ function overlayRecentReviews(items: QueueItem[]): void {
       item.reviewCount = patch.reviewCount;
       item.reviewInterval = patch.reviewInterval;
       item.nextReviewDate = patch.nextReviewDate;
+      item.difficulty = patch.difficulty;
+      item.lapses = patch.lapses;
     }
   }
 }
@@ -129,6 +135,11 @@ export async function getReviewQueue(forceFresh = false): Promise<QueueItem[]> {
       reviewCount: frontmatter.review_count as number | undefined,
       reviewedDate: toISODate(frontmatter.reviewed_date),
       reviewInterval: frontmatter.review_interval as number | undefined,
+      difficulty:
+        typeof frontmatter.difficulty === "string"
+          ? frontmatter.difficulty
+          : undefined,
+      lapses: typeof frontmatter.lapses === "number" ? frontmatter.lapses : 0,
       starred: frontmatter.starred === true,
     });
   }
@@ -184,6 +195,68 @@ export function categorize(items: QueueItem[], today: string): CategorizedQueue 
   };
 }
 
+// New ideas per day. Each idea learned today comes back roughly eight times
+// over the next months, so this rate — not willpower — sets how big every
+// future day's review load gets. Override with DAILY_NEW_LIMIT.
+export function dailyNewLimit(): number {
+  const n = parseInt(process.env.DAILY_NEW_LIMIT || "", 10);
+  return n > 0 ? n : 10;
+}
+
+export interface Session {
+  due: QueueItem[];
+  fresh: QueueItem[]; // today's share of new ideas
+  cards: QueueItem[]; // due first, then fresh — the session's running order
+  newSeenToday: number;
+  newLimit: number;
+  newWaiting: number; // new ideas beyond today's limit
+}
+
+// Today's session: every due card first (they're fading right now), then new
+// ideas up to the daily limit. Recomputed on every card — a reviewed card
+// drops out, and a new idea seen today shrinks the allowance by one, so the
+// session's end stays fixed while it runs.
+export function todaysSession(
+  items: QueueItem[],
+  today: string,
+  newLimit = dailyNewLimit()
+): Session {
+  const { unreviewed, dueForReview } = categorize(items, today);
+  // First looks today: approved today for the first time, or contested today.
+  const newSeenToday = items.filter(
+    (i) =>
+      i.reviewedDate === today &&
+      (i.status === "contested" ||
+        (i.status === "reviewed" && (i.reviewCount || 0) <= 1))
+  ).length;
+  const fresh = unreviewed.slice(0, Math.max(0, newLimit - newSeenToday));
+  return {
+    due: dueForReview,
+    fresh,
+    cards: [...dueForReview, ...fresh],
+    newSeenToday,
+    newLimit,
+    newWaiting: unreviewed.length - fresh.length,
+  };
+}
+
+// Reviewed ideas coming due on each of the next `days` days.
+export function forecast(
+  items: QueueItem[],
+  today: string,
+  days = 7
+): Array<{ date: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const i of items) {
+    if (i.status !== "reviewed" || !i.nextReviewDate) continue;
+    counts.set(i.nextReviewDate, (counts.get(i.nextReviewDate) || 0) + 1);
+  }
+  return Array.from({ length: days }, (_, k) => {
+    const date = addDaysISO(today, k + 1);
+    return { date, count: counts.get(date) || 0 };
+  });
+}
+
 // Patch the cached queue after a review commit so the very next card render
 // (within the TTL) sees the new status. Without this the just-reviewed item
 // re-appears in its old section and the session position resets to 1.
@@ -213,7 +286,12 @@ export function applyReviewToQueueCache(
       item.reviewInterval = 1;
       item.nextReviewDate = addDaysISO(today, 1);
     }
-  } else if (action === "easy" || action === "medium" || action === "hard") {
+  } else if (
+    action === "easy" ||
+    action === "medium" ||
+    action === "hard" ||
+    action === "forgot"
+  ) {
     // Same schedule as the committed file: elapsed is measured from the
     // previous review, before this one overwrites reviewedDate below.
     const nextInterval = computeNextInterval(
@@ -226,6 +304,8 @@ export function applyReviewToQueueCache(
     item.reviewCount = (item.reviewCount || 1) + 1;
     item.reviewInterval = nextInterval;
     item.nextReviewDate = addDaysISO(today, nextInterval);
+    item.difficulty = action;
+    if (action === "forgot") item.lapses = (item.lapses || 0) + 1;
   }
   // Refresh the TTL: the patched cache is now more accurate than an immediate
   // refetch (GitHub reads can lag the write by a moment).
@@ -239,6 +319,8 @@ export function applyReviewToQueueCache(
     reviewCount: item.reviewCount,
     reviewInterval: item.reviewInterval,
     nextReviewDate: item.nextReviewDate,
+    difficulty: item.difficulty,
+    lapses: item.lapses,
     isContest: action === "contest",
     at: Date.now(),
   });
@@ -253,6 +335,13 @@ export function queueForCard(
   mode: string | undefined,
   today: string
 ): QueueItem[] {
+  // A daily session runs due-then-new across sections. A card that isn't in
+  // it (opened from a list mid-session) falls back to its own section.
+  if (mode === "session") {
+    const { cards } = todaysSession(items, today);
+    if (cards.some((i) => i.path === currentPath)) return cards;
+  }
+
   const cat = categorize(items, today);
   // Re-review mode pins the due queue only when the card is actually due.
   // A reviewed-but-not-due card also runs in re-review mode (recall) but lives

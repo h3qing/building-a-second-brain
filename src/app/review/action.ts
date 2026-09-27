@@ -30,7 +30,7 @@ export async function reviewAction(formData: FormData) {
 
   const today = todayISO();
 
-  const srActions: Difficulty[] = ["easy", "medium", "hard"];
+  const srActions: Difficulty[] = ["easy", "medium", "hard", "forgot"];
   const isSR = srActions.includes(action as Difficulty);
   const isStar = action === "star" || action === "unstar";
 
