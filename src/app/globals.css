@@ -217,6 +217,11 @@ a {
   min-width: 0;
 }
 
+/* Approve / Contest (and ratings) stay the same height when a label wraps. */
+.action-row > form > .btn {
+  height: 100%;
+}
+
 /* Four ratings don't fit a phone's width in one row — go 2 × 2. */
 @media (max-width: 480px) {
   .rating-row {
@@ -771,5 +776,80 @@ a {
 @media (monochrome), (pointer: coarse) {
   .key-hints {
     display: none;
+  }
+}
+
+/* Phones: the reveal button, then the rating/approve buttons, ride along at
+   the bottom of the screen, so a review never means scrolling to find where
+   to tap. Colour screens only — Kindle keeps its stacked layout. */
+@media (max-width: 640px) and (color) {
+  .action-dock {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    background: var(--background);
+    border-top: 1px solid var(--ink-border);
+    margin: 0 -1rem; /* <main> pads 1rem on phones: run edge to edge */
+    padding: 0.6rem 1rem calc(0.6rem + env(safe-area-inset-bottom));
+  }
+
+  /* The dock is the prompt; the caption above the ratings is redundant here. */
+  .action-dock > p {
+    display: none;
+  }
+
+  /* One compact row of four instead of 2 × 2, so the dock stays short. */
+  .action-dock .rating-row {
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+  }
+  .action-dock .rating-row > * {
+    flex: 1 1 0;
+  }
+  .action-dock .btn-rating {
+    min-height: 48px;
+    padding: 6px 4px;
+    font-size: 15px;
+  }
+}
+
+/* Fingers, not cursors: on touch screens every control gets a ~44px hit
+   area (Apple's minimum) without changing how it looks on a laptop. */
+@media (pointer: coarse) {
+  .touch-target,
+  .insight-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .take-side summary {
+    padding: 13px 0;
+  }
+
+  .concept-chip {
+    padding: 13px 12px;
+  }
+
+  .connect-item a {
+    display: inline-block;
+    padding: 8px 0;
+  }
+
+  /* Stars stay small glyphs; an invisible halo takes the tap. */
+  .star-toggle,
+  .rq-star-btn {
+    position: relative;
+  }
+  .star-toggle::after,
+  .rq-star-btn::after {
+    content: "";
+    position: absolute;
+    inset: -12px;
+  }
+
+  /* iOS zooms the page into any input under 16px when it's focused. */
+  .graph-search {
+    font-size: 16px;
   }
 }

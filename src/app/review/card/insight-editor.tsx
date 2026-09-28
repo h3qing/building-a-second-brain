@@ -264,13 +264,6 @@ export function ReviewCardForm({
         {!revealed ? (
           <div className="space-y-3">
             <p className="text-muted">{RECALL_PROMPT[cue]}</p>
-            <button
-              type="button"
-              className="btn btn-nav w-full text-lg"
-              onClick={reveal}
-            >
-              Reveal insight
-            </button>
           </div>
         ) : mode === "ai" ? (
           <div className="read">
@@ -290,6 +283,20 @@ export function ReviewCardForm({
           />
         )}
       </section>
+
+      {/* Reveal sits outside the insight section so that on phones it can
+          dock to the bottom of the screen (sticky can't leave its parent). */}
+      {!revealed && (
+        <div className="action-dock">
+          <button
+            type="button"
+            className="btn btn-nav w-full text-lg"
+            onClick={reveal}
+          >
+            Reveal insight
+          </button>
+        </div>
+      )}
 
       {/* Your own words — earlier takes, then room for a new one */}
       {revealed && isLoggedIn && (
@@ -350,7 +357,7 @@ export function ReviewCardForm({
 
       {/* Action buttons — hidden until revealed in recall mode (rate after recalling) */}
       {revealed && (
-        <div className="pt-2">
+        <div className="pt-2 action-dock">
           {!isLoggedIn ? (
             <Link
               href="/login"

@@ -8,7 +8,7 @@ export function CopyBriefButton({ markdown }: { markdown: string }) {
   return (
     <button
       type="button"
-      className="label hover:text-foreground transition-colors"
+      className="touch-target label hover:text-foreground transition-colors"
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(markdown);

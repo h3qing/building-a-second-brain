@@ -25,7 +25,7 @@ export default async function TensionsPage() {
           </h1>
           <Link
             href="/"
-            className="text-sm text-muted hover:text-foreground transition-colors"
+            className="touch-target text-sm text-muted hover:text-foreground transition-colors"
           >
             &larr; home
           </Link>
@@ -64,7 +64,7 @@ export default async function TensionsPage() {
                 </Link>
                 <Link
                   href={t.url}
-                  className="label whitespace-nowrap hover:text-foreground transition-colors"
+                  className="touch-target label whitespace-nowrap hover:text-foreground transition-colors"
                 >
                   {/* Signed in, "take a side" is the box below; this just opens the concept. */}
                   {isOwner ? "open concept" : "take a side"} &rarr;

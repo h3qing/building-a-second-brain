@@ -24,7 +24,7 @@ export default async function BriefPage({
       <div className="flex items-center justify-between text-sm">
         <Link
           href="/write"
-          className="text-muted hover:text-foreground transition-colors"
+          className="touch-target text-muted hover:text-foreground transition-colors"
         >
           &larr; Write
         </Link>

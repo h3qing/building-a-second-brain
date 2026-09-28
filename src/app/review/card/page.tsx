@@ -283,7 +283,7 @@ export default async function CardReview({
         <div className="flex items-center justify-between text-sm">
           <Link
             href="/review"
-            className="text-muted hover:text-foreground transition-colors"
+            className="touch-target text-muted hover:text-foreground transition-colors"
           >
             &larr; Queue
           </Link>
@@ -453,7 +453,7 @@ export default async function CardReview({
               <div style={{ marginRight: "-0.5rem", marginBottom: "-0.5rem" }}>
                 {item.relatedConcepts.map((concept) => {
                   const chipClass =
-                    "inline-block text-xs px-2.5 py-1 border border-border text-muted rounded-sm font-mono";
+                    "concept-chip inline-block text-xs px-2.5 py-1 border border-border text-muted rounded-sm font-mono";
                   const chipStyle = { marginRight: "0.5rem", marginBottom: "0.5rem" };
                   const name = concept.split("|")[0].split("/").pop()?.trim() || concept;
                   return conceptPages.has(conceptKey(concept)) ? (
@@ -480,7 +480,7 @@ export default async function CardReview({
           <div className="text-center">
             <Link
               href={cardHref(nextPath, navMode, done)}
-              className="text-sm text-muted hover:text-foreground transition-colors"
+              className="touch-target text-sm text-muted hover:text-foreground transition-colors"
             >
               Skip for now &rarr;
             </Link>

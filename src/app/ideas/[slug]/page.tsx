@@ -34,7 +34,7 @@ export default async function IdeaPage({
       <div>
         <Link
           href="/"
-          className="text-sm text-muted hover:text-foreground transition-colors"
+          className="touch-target text-sm text-muted hover:text-foreground transition-colors"
         >
           &larr; Knowledge Base
         </Link>
