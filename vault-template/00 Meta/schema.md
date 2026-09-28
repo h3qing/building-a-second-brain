@@ -40,7 +40,7 @@ Note: Kindle Notes have their own plugin-generated frontmatter. Do not modify it
 | `origin` | Yes | Usually `ai-generated` |
 | `review_status` | Yes | Starts as `unreviewed` |
 | `reviewed_date` | When reviewed | YYYY-MM-DD |
-| `review_count`, `review_interval`, `next_review_date`, `difficulty` | Spaced repetition | See [[CLAUDE]] → Spaced Repetition |
+| `review_count`, `review_interval`, `next_review_date`, `difficulty`, `lapses` | Spaced repetition | See [[CLAUDE]] → Spaced Repetition. `difficulty` is the last rating (`easy`/`medium`/`hard`/`forgot`); `lapses` counts "forgot" |
 | `tags` | Yes | First 1-2 are Topic labels; rest are descriptors |
 
 ### Concept notes (`30 Concept/`)
@@ -65,6 +65,10 @@ Note: Kindle Notes have their own plugin-generated frontmatter. Do not modify it
 | `aliases` | No | Romanization, alternate names (so links resolve either way) |
 | `last_updated` | Yes | YYYY-MM-DD of last edit |
 | `tags` | Yes | Their kebab-case name tag (e.g. `morgan-housel`) + orgs |
+
+### Idea note body
+
+`## Insight` (1-2 sentences) → `## Recall` (one question whose answer is the insight; the review card's cue) → `## Source Context` (exact quote / embed / timestamp) → `## Related Concepts`.
 
 ## Naming Conventions
 

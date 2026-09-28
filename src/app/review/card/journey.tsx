@@ -46,6 +46,7 @@ export async function IdeaJourney({
     typeof frontmatter.review_count === "number" ? frontmatter.review_count : 0;
   const sourceType =
     typeof frontmatter.source_type === "string" ? frontmatter.source_type : "";
+  const lapses = typeof frontmatter.lapses === "number" ? frontmatter.lapses : 0;
 
   const [commits, sourceFile] = await Promise.all([
     listCommits({ path }).catch(() => []),
@@ -86,6 +87,15 @@ export async function IdeaJourney({
     rows.push({
       icon: "🔁",
       text: `Last reviewed ${timeAgo(reviewedDate, today)} · ${visits}`,
+    });
+  }
+  if (lapses > 0) {
+    rows.push({
+      icon: "🌀",
+      text:
+        lapses >= 3
+          ? `Slipped away ${lapses} times — maybe the card itself needs rewriting`
+          : `Slipped away ${lapses === 1 ? "once" : "twice"} — relearning makes it stick`,
     });
   }
   if (nextReviewDate && frontmatter.review_status === "reviewed") {

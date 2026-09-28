@@ -16,6 +16,10 @@ tags: []
 
 <!-- 1-2 sentences. The idea in context of its source. No em-dashes, no generic summary. -->
 
+## Recall
+
+<!-- One question whose answer is the insight. ~10-second answer, asks why/how, doesn't restate the title. -->
+
 ## Source Context
 
 <!-- Most specific reference available:

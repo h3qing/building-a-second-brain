@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { reviewAction } from "@/app/review/action";
+import { useRecall } from "./recall";
 
 interface ReviewCardFormProps {
   currentPath: string;
@@ -14,13 +15,27 @@ interface ReviewCardFormProps {
   aiInsight: string;
   insightParagraphs: string[];
   isLoggedIn: boolean;
-  // Active recall: hide the insight until the user chooses to reveal it, so
-  // re-reviews test recall instead of just re-reading the answer.
-  recallMode: boolean;
+  // What the reader recalls from while the answer is hidden: the card's
+  // `## Recall` question, the book highlight shown above, or just the title.
+  cue: "question" | "highlight" | "title";
+  recallQuestion: string;
   // Prev/next card hrefs for arrow-key navigation (null at the queue edges).
   prevHref: string | null;
   nextHref: string | null;
+  // Re-reviews: when each rating would bring the card back, e.g. "12d".
+  ratingHints?: Partial<Record<Rating, string>>;
 }
+
+const RATINGS = ["easy", "medium", "hard", "forgot"] as const;
+type Rating = (typeof RATINGS)[number];
+
+const RECALL_PROMPT: Record<ReviewCardFormProps["cue"], string> = {
+  question: "Answer it out loud, then reveal to check yourself.",
+  highlight:
+    "Recall the insight from the highlight above. Say it out loud, then reveal to check yourself.",
+  title:
+    "What's the insight behind this, and why does it hold? Say it out loud, then reveal to check yourself.",
+};
 
 export function ReviewCardForm({
   currentPath,
@@ -31,21 +46,25 @@ export function ReviewCardForm({
   aiInsight,
   insightParagraphs,
   isLoggedIn,
-  recallMode,
+  cue,
+  recallQuestion,
   prevHref,
   nextHref,
+  ratingHints,
 }: ReviewCardFormProps) {
   const router = useRouter();
   const [mode, setMode] = useState<"ai" | "custom">("ai");
   const [customText, setCustomText] = useState("");
-  // In recall mode the insight starts hidden; otherwise it's always shown.
-  const [revealed, setRevealed] = useState(!recallMode);
+  // Hidden until revealed in recall mode (state shared with the page's other
+  // answer-bearing sections via RecallProvider).
+  const { revealed, reveal } = useRecall();
 
   // Keyboard shortcuts drive the existing forms via requestSubmit(), so a
   // submit here is exactly the same server action as a button click.
   const easyFormRef = useRef<HTMLFormElement>(null);
   const mediumFormRef = useRef<HTMLFormElement>(null);
   const hardFormRef = useRef<HTMLFormElement>(null);
+  const forgotFormRef = useRef<HTMLFormElement>(null);
   const approveFormRef = useRef<HTMLFormElement>(null);
   const contestFormRef = useRef<HTMLFormElement>(null);
   // Each rating submit is a real GitHub commit, so once any form submits the
@@ -56,6 +75,7 @@ export function ReviewCardForm({
     easy: easyFormRef,
     medium: mediumFormRef,
     hard: hardFormRef,
+    forgot: forgotFormRef,
   };
 
   // Client state survives searchParams-only navigation, so re-arm the
@@ -80,7 +100,7 @@ export function ReviewCardForm({
 
       if (!revealed && (e.key === " " || e.key === "Enter")) {
         e.preventDefault();
-        setRevealed(true);
+        reveal();
         return;
       }
 
@@ -102,6 +122,7 @@ export function ReviewCardForm({
         if (e.key === "1") submit(easyFormRef.current);
         else if (e.key === "2") submit(mediumFormRef.current);
         else if (e.key === "3") submit(hardFormRef.current);
+        else if (e.key === "4") submit(forgotFormRef.current);
       } else if (e.key === "a" || e.key === "A") {
         submit(approveFormRef.current);
       } else if (e.key === "c" || e.key === "C") {
@@ -111,7 +132,7 @@ export function ReviewCardForm({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [revealed, isLoggedIn, isReReview, prevHref, nextHref, router]);
+  }, [revealed, reveal, isLoggedIn, isReReview, prevHref, nextHref, router]);
 
   // Set on any submit (click or key) so a follow-up shortcut can't
   // double-commit.
@@ -127,7 +148,7 @@ export function ReviewCardForm({
     : !isLoggedIn
       ? "←→ navigate"
       : isReReview
-        ? "1 easy · 2 medium · 3 hard · ←→ navigate"
+        ? "1 easy · 2 medium · 3 hard · 4 forgot · ←→ navigate"
         : "a approve · c contest · ←→ navigate";
 
   return (
@@ -176,16 +197,19 @@ export function ReviewCardForm({
           )}
         </div>
 
+        {revealed && recallQuestion && (
+          <p className="recall-question-small">
+            <span className="label">Q</span> {recallQuestion}
+          </p>
+        )}
+
         {!revealed ? (
           <div className="space-y-3">
-            <p className="text-muted">
-              Recall the insight from the highlight above. Say it out loud, then
-              reveal to check yourself.
-            </p>
+            <p className="text-muted">{RECALL_PROMPT[cue]}</p>
             <button
               type="button"
               className="btn btn-nav w-full text-lg"
-              onClick={() => setRevealed(true)}
+              onClick={reveal}
             >
               Reveal insight
             </button>
@@ -224,8 +248,8 @@ export function ReviewCardForm({
               <p className="text-sm text-muted text-center mb-3">
                 How well did you recall this?
               </p>
-              <div className="action-row">
-                {(["easy", "medium", "hard"] as const).map((difficulty) => (
+              <div className="action-row rating-row">
+                {RATINGS.map((difficulty) => (
                   <form
                     key={difficulty}
                     action={reviewAction}
@@ -249,9 +273,14 @@ export function ReviewCardForm({
                     />
                     <button
                       type="submit"
-                      className={`btn btn-${difficulty} w-full text-lg capitalize`}
+                      className={`btn btn-${difficulty} btn-rating w-full capitalize`}
                     >
-                      {difficulty}
+                      <span>{difficulty}</span>
+                      {ratingHints?.[difficulty] && (
+                        <span className="rating-hint">
+                          {ratingHints[difficulty]}
+                        </span>
+                      )}
                     </button>
                   </form>
                 ))}

@@ -97,6 +97,9 @@ tags: [Topic1, Topic2, descriptor, person-or-org]
 ## Insight
 1-2 sentences, in context of the argument. No generic summaries. No em-dashes.
 
+## Recall
+One question whose answer is the insight (the review card shows it while the insight is hidden).
+
 ## Source Context
 > exact quote/blockquote from the source
 > (podcasts: add `[MM:SS](youtube_url&t=seconds)`; books: `![[Book - Author#^ref-XXXXX]]`)
@@ -104,6 +107,11 @@ tags: [Topic1, Topic2, descriptor, person-or-org]
 ## Related Concepts
 [[concept-a]] | [[concept-b]] | [[concept-c]]
 ```
+**Recall question**: answerable from memory in ~10 seconds; asks why/how/what-follows, not
+yes/no; doesn't restate the title (the title usually *is* the answer); names the
+person/source if that disambiguates; same language as the insight. If the answer is a
+list of 3+ separate claims, the idea isn't atomic: split it.
+
 **Tag convention**: first 1-2 tags are capitalized Topic labels from the vault
 CLAUDE.md's controlled Topic Vocabulary (extend conservatively). Remaining tags are
 lowercase-hyphenated descriptors. **Always** add primary person(s)/org as kebab-case

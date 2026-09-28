@@ -4,10 +4,13 @@ import {
   getReviewQueue,
   categorize,
   cardHref,
+  todaysSession,
+  forecast,
   type QueueItem,
 } from "@/lib/review-queue";
 import { spanLabel, daysBetween, timeUntil, todayISO } from "@/lib/time";
 import { ReviewStats } from "@/app/components/ReviewStats";
+import { DueForecast } from "@/app/components/DueForecast";
 import { reviewAction } from "@/app/review/action";
 import { StarredFilter } from "./starred-filter";
 
@@ -169,8 +172,14 @@ function CardSection({
   );
 }
 
-export default async function ReviewQueue() {
+export default async function ReviewQueue({
+  searchParams,
+}: {
+  searchParams: Promise<{ completed?: string }>;
+}) {
   const isLoggedIn = await verifySession();
+  // Set by the last card of a daily session: how many cards it went through.
+  const completed = Math.max(0, parseInt((await searchParams).completed ?? "", 10) || 0);
 
   const today = todayISO();
   const allItems = await getReviewQueue(true);
@@ -191,20 +200,20 @@ export default async function ReviewQueue() {
   const backWhen = (item: QueueItem) =>
     item.nextReviewDate ? `back ${timeUntil(item.nextReviewDate, today)}` : null;
 
-  // Due re-reviews come first: they're fading right now, while new ideas can
-  // wait a day. With nothing due, the button starts on the new ones.
+  // One button runs today's session: due cards first (they're fading right
+  // now), then new ideas up to the daily limit.
+  const session = todaysSession(allItems, today);
   const startHref = !isLoggedIn
     ? "/login"
-    : dueForReview.length > 0
-      ? cardHref(dueForReview[0].path, "rereview")
-      : unreviewed.length > 0
-        ? cardHref(unreviewed[0].path)
-        : null;
-  const startCta = !isLoggedIn
-    ? "Sign in to review"
-    : dueForReview.length > 0
-      ? `Review ${dueForReview.length} due`
-      : "Start Reviewing";
+    : session.cards.length > 0
+      ? cardHref(session.cards[0].path, "session")
+      : null;
+  const startCta = !isLoggedIn ? "Sign in to review" : "Start today\u2019s review";
+
+  // What today's reviews produced, for the end-of-session summary.
+  const reviewedToday = allItems.filter((i) => i.reviewedDate === today);
+  const forgotToday = reviewedToday.filter((i) => i.difficulty === "forgot").length;
+  const upcoming = forecast(allItems, today);
 
   return (
     <div className="space-y-10">
@@ -238,7 +247,50 @@ export default async function ReviewQueue() {
           <Stat count={contested.length} label="contested" />
           <Stat count={reviewed.length} label="reviewed" />
         </div>
+
+        {isLoggedIn && session.cards.length > 0 && (
+          <p className="text-sm text-muted">
+            Today: {session.due.length} due + {session.fresh.length} new
+            {session.newWaiting > 0 &&
+              ` · ${session.newWaiting} more new waiting (${session.newLimit}/day)`}
+          </p>
+        )}
+
+        {isLoggedIn &&
+          session.cards.length === 0 &&
+          session.newWaiting > 0 &&
+          unreviewed.length > 0 && (
+            <p className="text-sm text-muted">
+              Today&apos;s {session.newLimit} new ideas are done; {session.newWaiting}{" "}
+              more wait for tomorrow. Spacing them out keeps future review days
+              light.{" "}
+              <Link
+                href={cardHref(unreviewed[0].path)}
+                className="underline hover:text-foreground"
+              >
+                Keep going anyway &rarr;
+              </Link>
+            </p>
+          )}
       </header>
+
+      {isLoggedIn && completed > 0 && (
+        <section className="session-done">
+          <p className="font-heading" style={{ fontSize: "1.25rem" }}>
+            Session complete: {completed} {completed === 1 ? "card" : "cards"}.
+          </p>
+          <p className="text-sm text-muted">
+            {reviewedToday.length} reviewed today
+            {session.newSeenToday > 0 && ` · ${session.newSeenToday} new`}
+            {forgotToday > 0 && ` · ${forgotToday} forgot (back tomorrow)`}
+            {upcoming[0].count > 0
+              ? ` · ${upcoming[0].count} due tomorrow`
+              : " · nothing due tomorrow"}
+          </p>
+        </section>
+      )}
+
+      {isLoggedIn && <DueForecast days={upcoming} />}
 
       {isLoggedIn && <ReviewStats />}
 

@@ -1,6 +1,7 @@
 import matter from "gray-matter";
 import { getFileViaTree } from "./github";
 import { addDaysISO, daysBetween, toISODate } from "./time";
+import { extractSection } from "./markdown";
 
 export interface SourceContext {
   quote: string;
@@ -16,6 +17,9 @@ export interface ReviewItem {
   sourceHighlights: SourceHighlight[];
   sourceContext: SourceContext[];
   relatedConcepts: string[];
+  // The `## Recall` prompt: a question whose answer is the insight. Empty for
+  // notes extracted before the section existed.
+  recallQuestion: string;
   frontmatter: Record<string, unknown>;
   rawContent: string;
 }
@@ -68,7 +72,9 @@ export function extractSourceContext(content: string): SourceContext[] {
   );
   if (!section) return [];
 
-  const text = section[1].trim();
+  // Book embeds (`![[Book#^ref-123]]`) are resolved into the Original
+  // Highlight block — never echo them here as raw wikilink syntax.
+  const text = section[1].replace(/!\[\[[^\]]*\]\]/g, "").trim();
   if (!text) return [];
 
   const contexts: SourceContext[] = [];
@@ -104,7 +110,9 @@ export function extractSourceContext(content: string): SourceContext[] {
 
   // If no timestamps found, extract blockquotes as plain source context
   if (contexts.length === 0) {
-    const blockquotes = text.match(/^>\s*.+$/gm);
+    // [ \t]* not \s*: \s would run across the blank ">" line between quoted
+    // paragraphs and swallow the next line's ">" into the quote text.
+    const blockquotes = text.match(/^>[ \t]*.+$/gm);
     if (blockquotes) {
       for (const bq of blockquotes) {
         const clean = bq.replace(/^>\s*/, "").trim();
@@ -175,6 +183,9 @@ export async function parseReviewItem(
   const sourceHighlights = await resolveHighlights(content);
   const sourceContext = extractSourceContext(content);
   const relatedConcepts = extractRelatedConcepts(content);
+  const recallQuestion = extractSection(content, "Recall")
+    .replace(/^(?:[-*>]\s*)?(?:Q[:：]|问[:：])?\s*/i, "")
+    .trim();
 
   return {
     path,
@@ -184,6 +195,7 @@ export async function parseReviewItem(
     sourceHighlights,
     sourceContext,
     relatedConcepts,
+    recallQuestion,
     frontmatter,
     rawContent,
   };
@@ -214,34 +226,49 @@ export function replaceInsight(rawContent: string, newInsight: string): string {
   return matter.stringify(content, updated);
 }
 
-export type Difficulty = "easy" | "medium" | "hard";
+// "forgot" is the lapse button: the card couldn't be recalled at all.
+export type Difficulty = "easy" | "medium" | "hard" | "forgot";
 
-const DIFFICULTY_MULTIPLIER: Record<Difficulty, number> = {
+const DIFFICULTY_MULTIPLIER: Record<Exclude<Difficulty, "forgot">, number> = {
   easy: 3,
   medium: 2,
   hard: 1,
 };
 
+// How much of an overdue gap counts as proof the memory lasted. Recalling a
+// card easily 30 days past due shows it held for those 30 days; a hard recall
+// shows nothing extra. (The same delay credit Anki's scheduler gives.)
+const OVERDUE_CREDIT: Record<Exclude<Difficulty, "forgot">, number> = {
+  easy: 1,
+  medium: 0.5,
+  hard: 0,
+};
+
 const MAX_INTERVAL = 180;
 
-// Growth is earned by recalling after the full interval. A card opened early
-// (from the Reviewed list, before it's due) only proves recall after
-// `elapsedDays`, so the multiplier applies to that — otherwise rating a 30-day
-// card "easy" the day after its last review jumped it to 90 days. Early
-// reviews never shrink the interval either. On-time and overdue reviews
-// (elapsed >= interval) scale the interval exactly as before.
+// Next interval in days, from the scheduled interval and the days actually
+// elapsed since the last review:
+// - forgot: the memory is gone, so it relearns from a 1-day interval.
+// - early (elapsed < interval, e.g. opened from the Reviewed list): only the
+//   elapsed days are proven, so growth is scaled from those — and never
+//   shrinks the interval.
+// - on time: interval × multiplier (Easy 3×, Medium 2×, Hard 1×).
+// - overdue: the late days count toward the base per OVERDUE_CREDIT.
 export function computeNextInterval(
   currentInterval: number,
   difficulty: Difficulty,
   elapsedDays?: number
 ): number {
+  if (difficulty === "forgot") return 1;
+  const elapsed =
+    elapsedDays === undefined ? currentInterval : Math.max(0, elapsedDays);
   const earned =
-    elapsedDays === undefined
-      ? currentInterval
-      : Math.min(currentInterval, Math.max(0, elapsedDays));
-  const next = Math.max(
-    currentInterval,
-    earned * DIFFICULTY_MULTIPLIER[difficulty]
+    elapsed < currentInterval
+      ? elapsed
+      : currentInterval +
+        (elapsed - currentInterval) * OVERDUE_CREDIT[difficulty];
+  const next = Math.round(
+    Math.max(currentInterval, earned * DIFFICULTY_MULTIPLIER[difficulty])
   );
   return Math.min(next, MAX_INTERVAL);
 }
@@ -300,7 +327,7 @@ export function updateSpacedRepetition(
     elapsedSince(data.reviewed_date, date)
   );
 
-  const updated = {
+  const updated: Record<string, unknown> = {
     ...data,
     review_status: "reviewed",
     reviewed_date: date,
@@ -309,6 +336,11 @@ export function updateSpacedRepetition(
     next_review_date: addDaysISO(date, nextInterval),
     difficulty,
   };
+  // Count lapses: a card forgotten again and again is usually a badly shaped
+  // card (too big, too vague), worth rewriting rather than drilling.
+  if (difficulty === "forgot") {
+    updated.lapses = ((data.lapses as number) || 0) + 1;
+  }
 
   return matter.stringify(content, updated);
 }

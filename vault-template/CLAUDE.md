@@ -104,7 +104,8 @@ reviewed_date:          # YYYY-MM-DD, set when reviewed
 review_count: 0          # times reviewed (set on first approval)
 review_interval: 1       # days until next review
 next_review_date:        # YYYY-MM-DD, computed after each review
-difficulty:              # easy | medium | hard (set on re-reviews)
+difficulty:              # last re-review rating: easy | medium | hard | forgot
+lapses:                  # times rated "forgot" (set by the review app; omit when 0)
 tags: []                 # first 1-2 entries are top-level Topic labels (see below)
 ---
 ```
@@ -135,8 +136,13 @@ On re-review, interval multiplied by difficulty:
 - **Easy** = 3x (well internalized, see it less)
 - **Medium** = 2x (decent recall, standard spacing)
 - **Hard** = 1x (struggling, keep interval the same)
+- **Forgot** = reset to 1 day and `lapses += 1` (couldn't recall it at all — relearn it)
 
-Interval cap: 180 days. Missing SR fields are treated as defaults (backward-compatible).
+Timing adjusts the base the multiplier applies to:
+- **Early** (reviewed before `next_review_date`): only the days actually elapsed count, so an early review never inflates the interval (and never shrinks it).
+- **Overdue**: the late days count as proof the memory lasted — fully for Easy, half for Medium, not at all for Hard.
+
+Interval cap: 180 days. Missing SR fields are treated as defaults (backward-compatible). A card with `lapses` of 3+ is usually badly shaped (too big, too vague): rewrite or split it rather than drilling it.
 
 ### Concept notes (`30 Concept/`)
 
@@ -253,6 +259,12 @@ Filename format: `{Title} - {Author}.md` (or `{Title}.md` if no author)
   - Descriptive filename (the idea itself, short)
   - Frontmatter with `review_status: unreviewed`, plus `source_date` (the source's publish/record date) and the primary person/org as tags — these anchor later **retro verification** of time-bound claims
   - **`## Insight` section**: 1-2 sentences max. Put the quote in context of the source (where in the argument it falls, what it builds on). No em-dashes. No generic summaries.
+  - **`## Recall` section** (right after Insight): ONE question whose answer is the insight — the prompt the review card shows while the insight is hidden. Rules:
+    - Answerable from memory in about 10 seconds. If the honest answer is a list of 3+ separate claims, the idea isn't atomic: split it into separate idea files.
+    - Asks for the *why*, *how*, or *what it implies*, not a yes/no.
+    - Doesn't contain its own answer. The idea's title usually states the claim, so don't restate the title as a question ("Is restraint a strategy?"); ask what the title can't answer ("Why does Liang call restraint a strategy rather than a cost?").
+    - Specific enough that only this idea answers it: name the person/source when that disambiguates.
+    - Same language as the insight.
   - Wikilinks to related concepts
   - **`## Source Context` section** (mandatory) with the most specific source reference:
     - **Books**: Obsidian embed reference `![[Book - Author#^ref-XXXXX]]`
@@ -297,6 +309,18 @@ Keeps the review pipeline fed. When unreviewed items drop below 10, suggest extr
 3. Suggest the top 1-2 un-extracted sources by richness (e.g. `highlightsCount` for books — richer sources first)
 4. Run the standard Ingest pipeline (Step 1-6) on user approval
 5. Update extraction-tracker.md: move the source to the "Extracted" table, record date and idea count
+
+### Backfill Recall Questions
+
+Ideas extracted before the `## Recall` section existed have no question, so their review card falls back to the title or highlight as the cue (weaker: the title often *is* the answer).
+
+**Trigger:** User says "backfill recall questions" (optionally scoped: a source, a topic, or "due this week").
+
+1. Find idea files with no `## Recall` section, due-soonest first (`next_review_date` ascending), unreviewed last
+2. For each, read the Insight + Source Context and write one question following the extraction rules above
+3. Insert `## Recall` right after `## Insight`. Change nothing else: not the insight, not `review_status`, not the SR fields (adding a question is not a review)
+4. If an idea can't get a 10-second question because it bundles several claims, don't force one: list it for the human as a split candidate
+5. Log it (`## [date] restructure | Backfill recall questions`) and commit
 
 ### Query
 

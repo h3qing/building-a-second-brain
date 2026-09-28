@@ -16,6 +16,10 @@ tags: [AI, Strategy, ai-accelerates-ai, liang-wenfeng, deepseek]
 
 DeepSeek 内部看重的叙事是：下一版模型首先要帮自己提升开发效率，第一目标不是用户好用而是自己好用，因为 AI 加速 AI 研究会让进展变成非线性，这也是先解决持续学习再做通用智能的原因。
 
+## Recall
+
+DeepSeek 下一版模型的第一目标用户是谁？为什么这样排？
+
 ## Source Context
 
 > 或者说简单一点，我们做的模型，第一目标不是大家用得好用，而是我们自己用得好用。

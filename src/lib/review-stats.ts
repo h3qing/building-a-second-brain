@@ -4,7 +4,7 @@ import { addDaysISO, localISODate, todayISO } from "./time";
 export interface ReviewEvent {
   date: string; // YYYY-MM-DD, in APP_TIMEZONE
   slug: string;
-  action: "approve" | "contest" | "easy" | "medium" | "hard";
+  action: "approve" | "contest" | "easy" | "medium" | "hard" | "forgot";
 }
 
 export interface HeatmapCell {
@@ -25,7 +25,7 @@ export interface ReviewStatsData {
 
 // Matches: review: approve "slug"  OR  review: easy "slug"
 const REVIEW_RE =
-  /^review:\s+(approve|contest|easy|medium|hard)\s+"([^"]+)"/i;
+  /^review:\s+(approve|contest|easy|medium|hard|forgot)\s+"([^"]+)"/i;
 
 export function parseReviewEvents(commits: CommitSummary[]): ReviewEvent[] {
   const events: ReviewEvent[] = [];
