@@ -136,10 +136,12 @@ export async function ReviewStats() {
                     fill="var(--ink-accent)"
                     fillOpacity={LEVEL_OPACITY[cell.level]}
                   >
-                    <title>
-                      {cell.date}: {cell.count}{" "}
-                      {cell.count === 1 ? "idea" : "ideas"}
-                    </title>
+                    {/* One string child: React's server renderer emits an
+                        empty <title> when it has several text children, and
+                        the client's text nodes then fail to hydrate (#418). */}
+                    <title>{`${cell.date}: ${cell.count} ${
+                      cell.count === 1 ? "idea" : "ideas"
+                    }`}</title>
                   </rect>
                 );
               })
