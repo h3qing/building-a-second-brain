@@ -9,6 +9,8 @@ review_count: 0
 review_interval: 1
 next_review_date:
 difficulty:
+prediction:
+verify_by:
 tags: []
 ---
 

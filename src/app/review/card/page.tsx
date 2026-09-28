@@ -2,17 +2,25 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
 import { verifySession } from "@/lib/auth";
-import { getFileContent } from "@/lib/github";
+import { getFileContent, listFiles } from "@/lib/github";
 import {
   parseReviewItem,
   computeNextInterval,
   elapsedSince,
   type Difficulty,
 } from "@/lib/parser";
-import { getReviewQueue, queueForCard, cardHref } from "@/lib/review-queue";
-import { todayISO, shortSpan } from "@/lib/time";
+import {
+  getReviewQueue,
+  queueForCard,
+  cardHref,
+  findConnections,
+  conceptKey,
+} from "@/lib/review-queue";
+import { slugify, conceptHref, ideaHref } from "@/lib/slug";
+import { todayISO, shortSpan, toISODate } from "@/lib/time";
 import { ReviewCardForm } from "./insight-editor";
 import { RecallProvider, AfterReveal } from "./recall";
+import { readNotes, MY_TAKE } from "@/lib/notes";
 import { IdeaJourney } from "./journey";
 import { SourceCard } from "./source-card";
 import { reviewAction } from "@/app/review/action";
@@ -70,7 +78,10 @@ export default async function CardReview({
       item.frontmatter.review_status === "reviewed");
 
   // Active recall: re-reviews test recall by default; ?mode=recall forces it.
-  const recallMode = params.mode === "recall" || isReReview;
+  // Checking a prediction (arrived from the review page's list) isn't a
+  // recall test: show the whole card straight away.
+  const verifying = params.mode === "verify";
+  const recallMode = !verifying && (params.mode === "recall" || isReReview);
 
   // Recompute the queue server-side to find this card's neighbours, so the
   // session flows through the whole queue instead of bouncing back to /review
@@ -78,8 +89,13 @@ export default async function CardReview({
   const today = todayISO();
   // A daily session keeps its own running order across new and due cards.
   const navMode =
-    params.mode === "session" ? "session" : isReReview ? "rereview" : params.mode;
-  const queue = queueForCard(await getReviewQueue(), currentPath, navMode, today);
+    params.mode === "session" || verifying
+      ? params.mode
+      : isReReview
+        ? "rereview"
+        : params.mode;
+  const allItems = await getReviewQueue();
+  const queue = queueForCard(allItems, currentPath, navMode, today);
   const idx = queue.findIndex((i) => i.path === currentPath);
   const prevPath = idx > 0 ? queue[idx - 1].path : null;
   const nextPath =
@@ -143,6 +159,95 @@ export default async function CardReview({
     .map((line) => line.trim())
     .filter((line) => line !== "" && !line.startsWith("## "))
     .map((line) => line.replace(/^[-*]\s*/, ""));
+
+  // Other ideas under this card's concepts — the cross-source links the
+  // graph shows, turned into a question you answer after reveal.
+  const connections = findConnections(allItems, {
+    path: currentPath,
+    source: allItems.find((i) => i.path === currentPath)?.source ?? "",
+    concepts: item.relatedConcepts,
+  });
+  // Related chips link out only when the concept page exists.
+  const conceptPages = new Set(
+    (await listFiles("30 Concept")).map((p) =>
+      conceptKey(p.replace(/\.md$/, ""))
+    )
+  );
+
+  // A time-bound claim on this idea: once its check-by date arrives, judge it
+  // against what actually happened. Calibration is a skill; this is the loop.
+  const fm = item.frontmatter;
+  const prediction = typeof fm.prediction === "string" ? fm.prediction.trim() : "";
+  const verifyBy = toISODate(fm.verify_by);
+  const sourceDate = toISODate(fm.source_date);
+  const outcome =
+    typeof fm.prediction_outcome === "string" ? fm.prediction_outcome : "";
+  const checkDue = !!prediction && !!verifyBy && verifyBy <= today && !outcome;
+  const OUTCOME_LABEL: Record<string, string> = {
+    "came-true": "came true",
+    partly: "partly true",
+    wrong: "didn't happen",
+  };
+  const predictionBlock = prediction ? (
+    <section className="prediction-check space-y-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="label">Prediction</h2>
+        <span className="text-xs text-muted font-mono">
+          {outcome
+            ? `checked ${toISODate(fm.verified_date) ?? ""} · ${OUTCOME_LABEL[outcome] ?? outcome}`
+            : verifyBy
+              ? checkDue
+                ? `time to check (since ${verifyBy})`
+                : `check by ${verifyBy}`
+              : ""}
+        </span>
+      </div>
+      <p className="read">&ldquo;{prediction}&rdquo;</p>
+      {sourceDate && (
+        <p className="text-xs text-muted font-mono">said {sourceDate}</p>
+      )}
+      {checkDue && isLoggedIn && (
+        <form action={reviewAction} className="space-y-2">
+          <input type="hidden" name="path" value={currentPath} />
+          <input type="hidden" name="returnTo" value="/review" />
+          <input type="hidden" name="sha" value={item.sha} />
+          <input type="hidden" name="rawContent" value={item.rawContent} />
+          <textarea
+            name="myTake"
+            className="insight-textarea"
+            rows={2}
+            placeholder="What actually happened? One line of evidence, or a link. Saved to My Take."
+          />
+          <div className="action-row">
+            <button
+              type="submit"
+              name="action"
+              value="verify-came-true"
+              className="btn btn-easy w-full"
+            >
+              Came true
+            </button>
+            <button
+              type="submit"
+              name="action"
+              value="verify-partly"
+              className="btn btn-medium w-full"
+            >
+              Partly
+            </button>
+            <button
+              type="submit"
+              name="action"
+              value="verify-wrong"
+              className="btn btn-hard w-full"
+            >
+              Didn&apos;t
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
+  ) : null;
 
   const highlights = (
     <section className="space-y-3">
@@ -226,6 +331,8 @@ export default async function CardReview({
           )}
         </header>
 
+        {verifying && predictionBlock}
+
         {/* Where this idea comes from — cover, title, author. Loads in after
             the card so the source lookup never blocks first paint. */}
         <Suspense fallback={null}>
@@ -261,11 +368,14 @@ export default async function CardReview({
           prevHref={prevPath ? cardHref(prevPath, navMode, done) : null}
           nextHref={nextPath ? cardHref(nextPath, navMode, done) : null}
           ratingHints={ratingHints}
+          earlierTakes={readNotes(item.content, MY_TAKE)}
         />
 
         {/* Source Context + Related — the quote usually states the insight
             outright, so both wait for reveal */}
         <AfterReveal>
+          {!verifying && predictionBlock}
+
           {item.sourceContext.length > 0 && (
             <section className="space-y-3">
               <h2 className="label">Source Context</h2>
@@ -300,20 +410,67 @@ export default async function CardReview({
             </section>
           )}
 
+          {/* Connect — how does this sit next to what you already know? */}
+          {connections.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="label">Connect</h2>
+              {connections.map((c) => {
+                const slug = slugify(
+                  c.item.path.split("/").pop()?.replace(/\.md$/, "") || ""
+                );
+                return (
+                  <div key={c.item.path} className="connect-item">
+                    <p className="text-xs text-muted font-mono">
+                      also under {c.concept}
+                      {c.sameSource ? " · same source" : ` · ${c.item.source}`}
+                    </p>
+                    <a
+                      href={ideaHref(slug)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-heading hover:text-accent transition-colors"
+                      style={{ fontSize: "1.1rem" }}
+                    >
+                      {c.item.title}
+                    </a>
+                    {c.item.insight && (
+                      <p className="text-sm text-muted">{c.item.insight}</p>
+                    )}
+                  </div>
+                );
+              })}
+              <p className="text-sm text-muted" style={{ fontStyle: "italic" }}>
+                Same idea, a twist, or a clash? If you can say how they relate,
+                add it to your take.
+              </p>
+            </section>
+          )}
+
           {/* Related Concepts */}
           {item.relatedConcepts.length > 0 && (
             <section>
               <h2 className="label mb-3">Related</h2>
               <div style={{ marginRight: "-0.5rem", marginBottom: "-0.5rem" }}>
-                {item.relatedConcepts.map((concept) => (
-                  <span
-                    key={concept}
-                    className="inline-block text-xs px-2.5 py-1 border border-border text-muted rounded-sm font-mono"
-                    style={{ marginRight: "0.5rem", marginBottom: "0.5rem" }}
-                  >
-                    {concept}
-                  </span>
-                ))}
+                {item.relatedConcepts.map((concept) => {
+                  const chipClass =
+                    "inline-block text-xs px-2.5 py-1 border border-border text-muted rounded-sm font-mono";
+                  const chipStyle = { marginRight: "0.5rem", marginBottom: "0.5rem" };
+                  const name = concept.split("|")[0].split("/").pop()?.trim() || concept;
+                  return conceptPages.has(conceptKey(concept)) ? (
+                    <Link
+                      key={concept}
+                      href={conceptHref(slugify(name))}
+                      className={`${chipClass} hover:text-foreground hover:border-foreground transition-colors`}
+                      style={chipStyle}
+                    >
+                      {name}
+                    </Link>
+                  ) : (
+                    <span key={concept} className={chipClass} style={chipStyle}>
+                      {name}
+                    </span>
+                  );
+                })}
               </div>
             </section>
           )}

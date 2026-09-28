@@ -112,6 +112,10 @@ yes/no; doesn't restate the title (the title usually *is* the answer); names the
 person/source if that disambiguates; same language as the insight. If the answer is a
 list of 3+ separate claims, the idea isn't atomic: split it.
 
+**Predictions**: if an idea rests on a forecast, add `prediction:` (the claim, one line) and
+`verify_by:` (when it can be judged: the speaker's horizon from `source_date`, else +1 year) to
+its frontmatter. The review app brings it back on that date to check against reality.
+
 **Tag convention**: first 1-2 tags are capitalized Topic labels from the vault
 CLAUDE.md's controlled Topic Vocabulary (extend conservatively). Remaining tags are
 lowercase-hyphenated descriptors. **Always** add primary person(s)/org as kebab-case
@@ -179,6 +183,7 @@ Then report the broken cron so the user fixes it (commit/stash their WIP).
 
 ## Golden rules
 - NEVER modify `10 Notes/` after capture, or any Kindle frontmatter.
+- NEVER write in `## My Take` (ideas) or `## My Side` (concepts) — the human's own words.
 - ALL AI-generated content is `review_status: unreviewed`. Only the human marks reviewed.
 - Every file gets correct frontmatter. Use `[[wikilinks]]` liberally.
 - Don't reorganize/rename existing files. No emojis unless asked.

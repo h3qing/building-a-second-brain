@@ -2,6 +2,7 @@ import { listFiles, getFilesContent } from "./github";
 import { parseFrontmatter, extractTitle } from "./parser";
 import { extractSection, firstParagraph } from "./markdown";
 import { slugify, conceptHref } from "./slug";
+import { readNotes, MY_SIDE, type DatedNote } from "./notes";
 
 // A source (book or podcast) that feeds a concept, derived from the idea notes
 // that cite it. Podcasts carry an episode URL when one is available.
@@ -20,6 +21,8 @@ export interface Tension {
   text: string;
   tags: string[];
   sources: TensionSource[];
+  path: string; // vault path of the concept note, for taking a side
+  mySide: DatedNote | null; // your latest position — only when includePrivate
 }
 
 const WIKILINK_RE = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
@@ -85,7 +88,8 @@ async function buildConceptSources(): Promise<Map<string, TensionSource[]>> {
 }
 
 // Every concept with a substantive "## Tensions" section, with its sources.
-export async function getTensions(): Promise<Tension[]> {
+// `includePrivate` (the signed-in owner) adds your latest `## My Side`.
+export async function getTensions(includePrivate = false): Promise<Tension[]> {
   const [paths, conceptSources] = await Promise.all([
     listFiles("30 Concept"),
     buildConceptSources(),
@@ -113,6 +117,8 @@ export async function getTensions(): Promise<Tension[]> {
         ? (frontmatter.tags as string[])
         : [],
       sources: conceptSources.get(filename.toLowerCase()) || [],
+      path,
+      mySide: includePrivate ? readNotes(content, MY_SIDE).at(-1) ?? null : null,
     });
   }
   return out;

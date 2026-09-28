@@ -6,6 +6,8 @@ import {
   cardHref,
   todaysSession,
   forecast,
+  predictionsDue,
+  predictionTally,
   type QueueItem,
 } from "@/lib/review-queue";
 import { spanLabel, daysBetween, timeUntil, todayISO } from "@/lib/time";
@@ -215,6 +217,11 @@ export default async function ReviewQueue({
   const forgotToday = reviewedToday.filter((i) => i.difficulty === "forgot").length;
   const upcoming = forecast(allItems, today);
 
+  // Time-bound claims whose check-by date has come, and your record so far.
+  const toCheck = predictionsDue(allItems, today);
+  const tally = predictionTally(allItems, today);
+  const checked = tally.cameTrue + tally.partly + tally.wrong;
+
   return (
     <div className="space-y-10">
       <header className="space-y-5">
@@ -291,6 +298,36 @@ export default async function ReviewQueue({
       )}
 
       {isLoggedIn && <DueForecast days={upcoming} />}
+
+      {isLoggedIn && (toCheck.length > 0 || checked > 0 || tally.open > 0) && (
+        <section className="space-y-3">
+          <h2 className="label">
+            Predictions to check{toCheck.length > 0 && ` (${toCheck.length})`}
+          </h2>
+          {toCheck.map((i) => (
+            <div key={i.path} className="connect-item">
+              <Link
+                href={cardHref(i.path, "verify")}
+                className="font-heading hover:text-accent transition-colors"
+                style={{ fontSize: "1.1rem" }}
+              >
+                &ldquo;{i.prediction}&rdquo; &rarr;
+              </Link>
+              <p className="text-xs text-muted font-mono">
+                {i.source}
+                {i.sourceDate && ` · said ${i.sourceDate}`} · check by {i.verifyBy}
+              </p>
+            </div>
+          ))}
+          <p className="text-sm text-muted">
+            {checked > 0
+              ? `Your calibration: ${tally.cameTrue} came true · ${tally.partly} partly · ${tally.wrong} didn't`
+              : "No predictions checked yet"}
+            {tally.open > 0 &&
+              ` · ${tally.open} open${tally.nextCheck ? ` (next check ${tally.nextCheck})` : ""}`}
+          </p>
+        </section>
+      )}
 
       {isLoggedIn && <ReviewStats />}
 

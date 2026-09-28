@@ -679,6 +679,51 @@ a {
   padding: 0.75rem 1rem;
 }
 
+/* Tensions: owner's "take a side" disclosure. */
+.take-side {
+  margin-top: 0.75rem;
+}
+
+.take-side summary {
+  cursor: pointer;
+  color: var(--ink-accent);
+}
+
+.take-side form {
+  margin-top: 0.6rem;
+}
+
+/* Connect prompt: a sibling idea from another source under a shared concept. */
+.connect-item {
+  border-left: 2px solid var(--ink-border);
+  padding-left: 1rem;
+}
+
+/* Your earlier takes on a card — your words, set apart from the AI's. */
+.my-takes {
+  border-left: 2px solid var(--ink-text);
+  padding-left: 1rem;
+}
+
+.my-takes ul {
+  margin-top: 0.35rem;
+}
+
+.my-takes li {
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.my-takes li + li {
+  margin-top: 0.3rem;
+}
+
+.my-take-date {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--ink-muted);
+}
+
 /* After reveal, the recall question stays above the insight it asked for. */
 .recall-question-small {
   font-size: 0.95rem;

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { reviewAction } from "@/app/review/action";
 import { useRecall } from "./recall";
+import type { DatedNote } from "@/lib/notes";
 
 interface ReviewCardFormProps {
   currentPath: string;
@@ -24,6 +25,8 @@ interface ReviewCardFormProps {
   nextHref: string | null;
   // Re-reviews: when each rating would bring the card back, e.g. "12d".
   ratingHints?: Partial<Record<Rating, string>>;
+  // Your earlier `## My Take` lines on this idea, oldest first.
+  earlierTakes: DatedNote[];
 }
 
 const RATINGS = ["easy", "medium", "hard", "forgot"] as const;
@@ -51,10 +54,17 @@ export function ReviewCardForm({
   prevHref,
   nextHref,
   ratingHints,
+  earlierTakes,
 }: ReviewCardFormProps) {
   const router = useRouter();
   const [mode, setMode] = useState<"ai" | "custom">("ai");
   const [customText, setCustomText] = useState("");
+  // Your own words, saved with whichever button you press. Contest asks for
+  // them first: a disagreement is the most useful thing a review can record.
+  const [take, setTake] = useState("");
+  const [takeOpen, setTakeOpen] = useState(false);
+  const [contestArmed, setContestArmed] = useState(false);
+  const takeRef = useRef<HTMLTextAreaElement>(null);
   // Hidden until revealed in recall mode (state shared with the page's other
   // answer-bearing sections via RecallProvider).
   const { revealed, reveal } = useRecall();
@@ -76,6 +86,16 @@ export function ReviewCardForm({
     medium: mediumFormRef,
     hard: hardFormRef,
     forgot: forgotFormRef,
+  };
+
+  useEffect(() => {
+    if (takeOpen) takeRef.current?.focus();
+  }, [takeOpen, contestArmed]);
+
+  // Contest's first press (or "c"): open the take box and ask for a reason.
+  const armContest = () => {
+    setContestArmed(true);
+    setTakeOpen(true);
   };
 
   // Client state survives searchParams-only navigation, so re-arm the
@@ -116,6 +136,12 @@ export function ReviewCardForm({
       // Rating keys arm only after reveal; the flag blocks double-submits.
       if (!revealed || !isLoggedIn || submittedRef.current) return;
 
+      if (e.key === "t" || e.key === "T") {
+        e.preventDefault(); // don't type the "t" into the box it opens
+        setTakeOpen(true);
+        return;
+      }
+
       const submit = (form: HTMLFormElement | null) => form?.requestSubmit();
 
       if (isReReview) {
@@ -126,13 +152,27 @@ export function ReviewCardForm({
       } else if (e.key === "a" || e.key === "A") {
         submit(approveFormRef.current);
       } else if (e.key === "c" || e.key === "C") {
-        submit(contestFormRef.current);
+        if (take.trim() || contestArmed) submit(contestFormRef.current);
+        else {
+          e.preventDefault();
+          armContest();
+        }
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [revealed, reveal, isLoggedIn, isReReview, prevHref, nextHref, router]);
+  }, [
+    revealed,
+    reveal,
+    isLoggedIn,
+    isReReview,
+    prevHref,
+    nextHref,
+    router,
+    take,
+    contestArmed,
+  ]);
 
   // Set on any submit (click or key) so a follow-up shortcut can't
   // double-commit.
@@ -148,8 +188,26 @@ export function ReviewCardForm({
     : !isLoggedIn
       ? "←→ navigate"
       : isReReview
-        ? "1 easy · 2 medium · 3 hard · 4 forgot · ←→ navigate"
-        : "a approve · c contest · ←→ navigate";
+        ? "1 easy · 2 medium · 3 hard · 4 forgot · t take · ←→ navigate"
+        : "a approve · c contest · t take · ←→ navigate";
+
+  // The fields every review form posts: which note, where to go next, the
+  // (possibly edited) insight, and your take.
+  const commonFields = (
+    <>
+      <input type="hidden" name="path" value={currentPath} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+      <input type="hidden" name="sha" value={sha} />
+      <input type="hidden" name="rawContent" value={rawContent} />
+      <input type="hidden" name="customInsight" value={activeInsight} />
+      <input
+        type="hidden"
+        name="insightChanged"
+        value={insightChanged ? "true" : "false"}
+      />
+      <input type="hidden" name="myTake" value={take} />
+    </>
+  );
 
   return (
     <>
@@ -233,6 +291,63 @@ export function ReviewCardForm({
         )}
       </section>
 
+      {/* Your own words — earlier takes, then room for a new one */}
+      {revealed && isLoggedIn && (
+        <section className="space-y-3">
+          {earlierTakes.length > 0 && (
+            <div className="my-takes">
+              <h2 className="label">You wrote</h2>
+              <ul>
+                {earlierTakes
+                  .slice(-3)
+                  .reverse()
+                  .map((n, i) => (
+                    <li key={i}>
+                      {n.date && (
+                        <span className="my-take-date">
+                          {n.date}
+                          {n.label && ` · ${n.label}`}
+                        </span>
+                      )}{" "}
+                      {n.text}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+          {takeOpen ? (
+            <div className="space-y-2">
+              <label className="label" htmlFor="my-take">
+                {contestArmed ? "What do you disagree with?" : "Your take"}
+              </label>
+              <textarea
+                id="my-take"
+                ref={takeRef}
+                className="insight-textarea"
+                value={take}
+                onChange={(e) => setTake(e.target.value)}
+                placeholder={
+                  contestArmed
+                    ? "The claim, the evidence, or where it breaks. Saved to My Take."
+                    : isReReview
+                      ? "What stuck, what changed, what it connects to. Optional."
+                      : "In your own words, or where you'd use it. Optional."
+                }
+                rows={3}
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="insight-toggle"
+              onClick={() => setTakeOpen(true)}
+            >
+              + Add your take
+            </button>
+          )}
+        </section>
+      )}
+
       {/* Action buttons — hidden until revealed in recall mode (rate after recalling) */}
       {revealed && (
         <div className="pt-2">
@@ -256,21 +371,8 @@ export function ReviewCardForm({
                     ref={ratingFormRefs[difficulty]}
                     onSubmit={markSubmitted}
                   >
-                    <input type="hidden" name="path" value={currentPath} />
                     <input type="hidden" name="action" value={difficulty} />
-                    <input type="hidden" name="returnTo" value={returnTo} />
-                    <input type="hidden" name="sha" value={sha} />
-                    <input type="hidden" name="rawContent" value={rawContent} />
-                    <input
-                      type="hidden"
-                      name="customInsight"
-                      value={activeInsight}
-                    />
-                    <input
-                      type="hidden"
-                      name="insightChanged"
-                      value={insightChanged ? "true" : "false"}
-                    />
+                    {commonFields}
                     <button
                       type="submit"
                       className={`btn btn-${difficulty} btn-rating w-full capitalize`}
@@ -293,21 +395,8 @@ export function ReviewCardForm({
                 ref={approveFormRef}
                 onSubmit={markSubmitted}
               >
-                <input type="hidden" name="path" value={currentPath} />
                 <input type="hidden" name="action" value="approve" />
-                <input type="hidden" name="returnTo" value={returnTo} />
-                <input type="hidden" name="sha" value={sha} />
-                <input type="hidden" name="rawContent" value={rawContent} />
-                <input
-                  type="hidden"
-                  name="customInsight"
-                  value={activeInsight}
-                />
-                <input
-                  type="hidden"
-                  name="insightChanged"
-                  value={insightChanged ? "true" : "false"}
-                />
+                {commonFields}
                 <button type="submit" className="btn btn-approve w-full text-lg">
                   Approve
                 </button>
@@ -318,23 +407,21 @@ export function ReviewCardForm({
                 ref={contestFormRef}
                 onSubmit={markSubmitted}
               >
-                <input type="hidden" name="path" value={currentPath} />
                 <input type="hidden" name="action" value="contest" />
-                <input type="hidden" name="returnTo" value={returnTo} />
-                <input type="hidden" name="sha" value={sha} />
-                <input type="hidden" name="rawContent" value={rawContent} />
-                <input
-                  type="hidden"
-                  name="customInsight"
-                  value={activeInsight}
-                />
-                <input
-                  type="hidden"
-                  name="insightChanged"
-                  value={insightChanged ? "true" : "false"}
-                />
-                <button type="submit" className="btn btn-contest w-full text-lg">
-                  Contest
+                {commonFields}
+                <button
+                  type="submit"
+                  className="btn btn-contest w-full text-lg"
+                  onClick={(e) => {
+                    // First press asks why; the second one files it (a note
+                    // is encouraged, not required).
+                    if (!take.trim() && !contestArmed) {
+                      e.preventDefault();
+                      armContest();
+                    }
+                  }}
+                >
+                  {contestArmed ? "Contest with this note" : "Contest"}
                 </button>
               </form>
             </div>

@@ -12,6 +12,7 @@ This vault is a **personal knowledge base** following the [LLM Wiki pattern](htt
 4. **Every file you create or update must have correct frontmatter** (see Frontmatter Spec below)
 5. **Update `00 Meta/index.md` and `00 Meta/log.md`** after every ingest or significant operation
 6. **Use `[[wikilinks]]` extensively** — cross-references are the point of this system
+7. **Never write or edit `## My Take` (ideas) or `## My Side` (concepts)** — those sections are the human's own words, appended by the review app. Read them; quote them; never touch them
 
 ## Vault Structure
 
@@ -106,6 +107,10 @@ review_interval: 1       # days until next review
 next_review_date:        # YYYY-MM-DD, computed after each review
 difficulty:              # last re-review rating: easy | medium | hard | forgot
 lapses:                  # times rated "forgot" (set by the review app; omit when 0)
+prediction:              # optional: the time-bound claim to check later, one line in the speaker's terms
+verify_by:               # optional: YYYY-MM-DD when `prediction` can be judged
+prediction_outcome:      # set by the review app when checked: came-true | partly | wrong
+verified_date:           # set by the review app with prediction_outcome
 tags: []                 # first 1-2 entries are top-level Topic labels (see below)
 ---
 ```
@@ -209,6 +214,8 @@ One-sentence definition.
 [[concept1]] | [[concept2]] | [[concept3]]
 ```
 
+Below that, the human may have a `## My Side` section (their position on the tension, appended by the app's Tensions page). Leave it exactly as it is.
+
 That's the entire file. No "Key Insights" lists, no bullet points of ideas, no "Open Questions." The idea files link TO concepts via `[[wikilinks]]` in their Related Concepts section. Obsidian surfaces these as backlinks automatically.
 
 ## Operations
@@ -265,6 +272,7 @@ Filename format: `{Title} - {Author}.md` (or `{Title}.md` if no author)
     - Doesn't contain its own answer. The idea's title usually states the claim, so don't restate the title as a question ("Is restraint a strategy?"); ask what the title can't answer ("Why does Liang call restraint a strategy rather than a cost?").
     - Specific enough that only this idea answers it: name the person/source when that disambiguates.
     - Same language as the insight.
+  - **Predictions**: if the idea rests on a forecast ("X will happen", "within a year…"), set `prediction:` to that claim in one line and `verify_by:` to the date it can fairly be judged — the speaker's own horizon counted from `source_date`, or one year out if they gave none. The review app surfaces it on that date so the human can check it against what happened. Don't tag opinions or timeless claims.
   - Wikilinks to related concepts
   - **`## Source Context` section** (mandatory) with the most specific source reference:
     - **Books**: Obsidian embed reference `![[Book - Author#^ref-XXXXX]]`
@@ -328,7 +336,7 @@ When the human asks a question about their knowledge:
 
 1. Read `00 Meta/index.md` to find relevant pages
 2. Read relevant wiki pages
-3. Synthesize an answer with `[[wikilink]]` citations
+3. Synthesize an answer with `[[wikilink]]` citations. Where the human has a `## My Take` or `## My Side` on the topic, quote it — their own words outrank the extracted layer
 4. If the answer is valuable, offer to file it as a new concept or idea page
 
 ### Lint
@@ -339,8 +347,9 @@ When asked to health-check the wiki:
 2. Find orphan pages (no inbound links)
 3. Find concepts mentioned but lacking their own page
 4. Find stale claims superseded by newer sources
-5. Suggest new questions to investigate or sources to find
-6. Report findings, fix with human approval
+5. Find forecasts that lack `prediction` / `verify_by` (see Extract), and predictions past `verify_by` still unchecked
+6. Suggest new questions to investigate or sources to find
+7. Report findings, fix with human approval
 
 ### Review Support
 
@@ -348,7 +357,7 @@ When the human wants to review:
 
 1. Point them to `00 Meta/review-queue.md` (Dataview dashboard) — or the private `/review` page in the web app
 2. When they approve an item: update `review_status: reviewed` and set `reviewed_date`
-3. When they contest an item: update `review_status: contested` and note their concern
+3. When they contest an item: update `review_status: contested` and add their concern to `## My Take` as `- YYYY-MM-DD (contested): …` (the web app does this for you)
 4. When they edit an item: update `origin: ai-assisted` and `review_status: reviewed`
 
 ## Review Status Definitions
@@ -378,3 +387,4 @@ When the human wants to review:
 - Do not create files outside the established folder structure
 - Do not add emojis to files unless the human asks for them
 - Do not reorganize existing files unless explicitly asked
+- Do not write in `## My Take` or `## My Side` — the human's sections

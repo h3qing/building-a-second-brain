@@ -2,6 +2,7 @@ import { listFiles, getFilesContent } from "./github";
 import { parseFrontmatter, extractTitle } from "./parser";
 import { toISODate, todayISO } from "./time";
 import { slugify } from "./slug";
+import { stripSection, MY_SIDE, MY_TAKE } from "./notes";
 
 export interface GraphNode {
   id: string;
@@ -154,7 +155,8 @@ function sourceDisplayTitle(filename: string): string {
 // start sections with "## Insight" etc.), blockquote markers, link syntax,
 // inline markdown marks, and collapse whitespace.
 function makeExcerpt(content: string, maxLen: number): string {
-  return content
+  // The graph is public: your own sections never feed its hover cards.
+  return stripSection(stripSection(content, MY_TAKE), MY_SIDE)
     // Defensive: parseFrontmatter's malformed-YAML fallback can leave the
     // frontmatter block in place. Anchored so body `---` dividers survive.
     .replace(/^---\n[\s\S]*?\n---\n?/, "")

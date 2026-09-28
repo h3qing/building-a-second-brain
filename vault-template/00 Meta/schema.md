@@ -41,6 +41,8 @@ Note: Kindle Notes have their own plugin-generated frontmatter. Do not modify it
 | `review_status` | Yes | Starts as `unreviewed` |
 | `reviewed_date` | When reviewed | YYYY-MM-DD |
 | `review_count`, `review_interval`, `next_review_date`, `difficulty`, `lapses` | Spaced repetition | See [[CLAUDE]] → Spaced Repetition. `difficulty` is the last rating (`easy`/`medium`/`hard`/`forgot`); `lapses` counts "forgot" |
+| `prediction`, `verify_by` | For forecasts | The time-bound claim and when it can be judged; the review app surfaces it on that date |
+| `prediction_outcome`, `verified_date` | Set by app | `came-true` / `partly` / `wrong`, and when it was checked |
 | `tags` | Yes | First 1-2 are Topic labels; rest are descriptors |
 
 ### Concept notes (`30 Concept/`)
@@ -68,7 +70,9 @@ Note: Kindle Notes have their own plugin-generated frontmatter. Do not modify it
 
 ### Idea note body
 
-`## Insight` (1-2 sentences) → `## Recall` (one question whose answer is the insight; the review card's cue) → `## Source Context` (exact quote / embed / timestamp) → `## Related Concepts`.
+`## Insight` (1-2 sentences) → `## Recall` (one question whose answer is the insight; the review card's cue) → `## Source Context` (exact quote / embed / timestamp) → `## Related Concepts` → `## My Take` (human-owned: dated lines the review app appends — reactions, uses, contest reasons, prediction checks).
+
+Concept notes may end with `## My Side` (human-owned: your position on the tension). Both human sections are private: the web app never shows them on public pages, and the LLM never edits them.
 
 ## Naming Conventions
 

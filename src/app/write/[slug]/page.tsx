@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getWritingBrief, renderBriefMarkdown } from "@/lib/write";
 import { decodeSlug } from "@/lib/slug";
+import { verifySession } from "@/lib/auth";
 import { CopyBriefButton } from "./copy-button";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,8 @@ export default async function BriefPage({
   params: Promise<{ slug: string }>;
 }) {
   const slug = decodeSlug((await params).slug);
-  const brief = await getWritingBrief(slug);
+  // Signed in, the brief carries your own side and takes; public, it doesn't.
+  const brief = await getWritingBrief(slug, await verifySession());
   if (!brief) notFound();
 
   const markdown = renderBriefMarkdown(brief);
@@ -44,6 +46,13 @@ export default async function BriefPage({
         <section className="space-y-2">
           <h2 className="label">Tension to resolve</h2>
           <p className="read">{brief.tensions}</p>
+        </section>
+      )}
+
+      {brief.mySide && (
+        <section className="space-y-2">
+          <h2 className="label">Your side</h2>
+          <p className="read my-takes">{brief.mySide}</p>
         </section>
       )}
 
@@ -91,6 +100,16 @@ export default async function BriefPage({
               >
                 {idea.quote}
               </blockquote>
+            )}
+            {idea.takes.length > 0 && (
+              <div className="my-takes" style={{ marginTop: "0.5rem" }}>
+                <p className="label">Your take</p>
+                <ul>
+                  {idea.takes.map((t, i) => (
+                    <li key={i}>{t}</li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         ))}
