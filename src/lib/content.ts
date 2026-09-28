@@ -1,6 +1,7 @@
 import { listFiles, getFileViaTree } from "./github";
 import { parseFrontmatter, extractTitle } from "./parser";
 import { slugify, conceptHref, ideaHref } from "./slug";
+import { stripSection, MY_SIDE, MY_TAKE } from "./notes";
 import { remark } from "remark";
 import remarkGfm from "remark-gfm";
 import remarkRehype from "remark-rehype";
@@ -111,8 +112,19 @@ export async function renderMarkdown(
   return result.toString();
 }
 
+// Your own sections (My Take / My Side) render only for you, the signed-in
+// owner — public pages show the AI layer you've reviewed, not your notes.
+function publicBody(content: string, includePrivate: boolean): string {
+  return includePrivate
+    ? content
+    : stripSection(stripSection(content, MY_TAKE), MY_SIDE);
+}
+
 // Find a concept file by slug (direct path construction, no scanning)
-export async function findConceptBySlug(slug: string): Promise<{
+export async function findConceptBySlug(
+  slug: string,
+  includePrivate = false
+): Promise<{
   path: string;
   content: string;
   frontmatter: Record<string, unknown>;
@@ -129,7 +141,10 @@ export async function findConceptBySlug(slug: string): Promise<{
 
       const { frontmatter, content } = parseFrontmatter(file.content);
       const title = extractTitle(content, entry.path);
-      const bodyHtml = await renderMarkdown(content, fileIndex);
+      const bodyHtml = await renderMarkdown(
+        publicBody(content, includePrivate),
+        fileIndex
+      );
 
       return { path: entry.path, content, frontmatter, title, bodyHtml };
     }
@@ -139,7 +154,10 @@ export async function findConceptBySlug(slug: string): Promise<{
 }
 
 // Find an idea file by slug (direct lookup, no scanning)
-export async function findIdeaBySlug(slug: string): Promise<{
+export async function findIdeaBySlug(
+  slug: string,
+  includePrivate = false
+): Promise<{
   path: string;
   content: string;
   frontmatter: Record<string, unknown>;
@@ -157,7 +175,10 @@ export async function findIdeaBySlug(slug: string): Promise<{
       if (frontmatter.review_status !== "reviewed") return null;
 
       const title = extractTitle(content, entry.path);
-      const bodyHtml = await renderMarkdown(content, fileIndex);
+      const bodyHtml = await renderMarkdown(
+        publicBody(content, includePrivate),
+        fileIndex
+      );
 
       return { path: entry.path, content, frontmatter, title, bodyHtml };
     }

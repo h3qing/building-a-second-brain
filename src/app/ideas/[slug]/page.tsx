@@ -3,6 +3,7 @@ import Link from "next/link";
 import { findIdeaBySlug } from "@/lib/content";
 import { toISODate } from "@/lib/time";
 import { decodeSlug } from "@/lib/slug";
+import { verifySession } from "@/lib/auth";
 import { ContentViewTracker } from "@/app/components/content-view-tracker";
 
 export default async function IdeaPage({
@@ -11,7 +12,7 @@ export default async function IdeaPage({
   params: Promise<{ slug: string }>;
 }) {
   const slug = decodeSlug((await params).slug);
-  const idea = await findIdeaBySlug(slug);
+  const idea = await findIdeaBySlug(slug, await verifySession());
 
   if (!idea) notFound();
 
@@ -33,7 +34,7 @@ export default async function IdeaPage({
       <div>
         <Link
           href="/"
-          className="text-sm text-muted hover:text-foreground transition-colors"
+          className="touch-target text-sm text-muted hover:text-foreground transition-colors"
         >
           &larr; Knowledge Base
         </Link>

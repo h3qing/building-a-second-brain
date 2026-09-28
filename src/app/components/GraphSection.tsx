@@ -191,7 +191,7 @@ export default function GraphSection({ data }: { data: FilteredGraph }) {
           aria-label="Search the knowledge graph"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="px-3 py-1.5 text-sm bg-background/90 border border-border rounded-md backdrop-blur-sm focus:outline-none focus:border-accent"
+          className="graph-search px-3 py-1.5 text-sm bg-background/90 border border-border rounded-md backdrop-blur-sm focus:outline-none focus:border-accent"
         />
       </div>
 

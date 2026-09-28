@@ -30,6 +30,25 @@ export interface SourceHighlight {
   location: string;
 }
 
+// Write a note back to markdown. js-yaml reads an unquoted `2026-05-20` as a
+// Date, and dumping that Date again stores `2026-05-20T00:00:00.000Z` — so
+// every in-app review used to rewrite each date field in the note. Keep plain
+// calendar dates plain.
+export function stringifyNote(
+  content: string,
+  data: Record<string, unknown>
+): string {
+  const clean: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    const iso =
+      value instanceof Date && !isNaN(value.getTime())
+        ? value.toISOString()
+        : "";
+    clean[key] = iso.endsWith("T00:00:00.000Z") ? iso.slice(0, 10) : value;
+  }
+  return matter.stringify(content, clean);
+}
+
 export function parseFrontmatter(raw: string) {
   try {
     const { data, content } = matter(raw);
@@ -57,7 +76,7 @@ function extractEmbedRefs(content: string): string[] {
   return refs;
 }
 
-function extractRelatedConcepts(content: string): string[] {
+export function extractRelatedConcepts(content: string): string[] {
   const conceptSection = content.match(
     /##\s*Related\s*Concepts?\s*\n([\s\S]*?)(?=\n##|\n$|$)/i
   );
@@ -210,7 +229,7 @@ export function replaceInsight(rawContent: string, newInsight: string): string {
   const match = content.match(insightRegex);
   if (match) {
     const replaced = content.replace(insightRegex, `$1${newInsight.trim()}\n`);
-    return matter.stringify(replaced, updated);
+    return stringifyNote(replaced, updated);
   }
 
   // No existing ## Insight section — insert after the H1
@@ -220,10 +239,10 @@ export function replaceInsight(rawContent: string, newInsight: string): string {
     const before = content.slice(0, idx);
     const after = content.slice(idx);
     const inserted = `${before}\n\n## Insight\n${newInsight.trim()}\n${after}`;
-    return matter.stringify(inserted, updated);
+    return stringifyNote(inserted, updated);
   }
 
-  return matter.stringify(content, updated);
+  return stringifyNote(content, updated);
 }
 
 // "forgot" is the lapse button: the card couldn't be recalled at all.
@@ -301,7 +320,26 @@ export function updateReviewStatus(
     updated.next_review_date = addDaysISO(date, 1);
   }
 
-  return matter.stringify(content, updated);
+  return stringifyNote(content, updated);
+}
+
+// How a checked prediction turned out. Stored as `prediction_outcome`.
+export const PREDICTION_OUTCOMES = ["came-true", "partly", "wrong"] as const;
+export type PredictionOutcome = (typeof PREDICTION_OUTCOMES)[number];
+
+// Record a prediction check. Leaves review status and the SR schedule alone:
+// checking a claim against the world is a different act from recalling it.
+export function updatePredictionOutcome(
+  rawContent: string,
+  outcome: PredictionOutcome,
+  date: string
+): string {
+  const { data, content } = matter(rawContent);
+  return stringifyNote(content, {
+    ...data,
+    prediction_outcome: outcome,
+    verified_date: date,
+  });
 }
 
 // Toggle a note's star flag without touching its review status or SR schedule.
@@ -310,7 +348,7 @@ export function updateReviewStatus(
 export function updateStarStatus(rawContent: string, starred: boolean): string {
   const { data, content } = matter(rawContent);
   const updated = { ...data, starred };
-  return matter.stringify(content, updated);
+  return stringifyNote(content, updated);
 }
 
 export function updateSpacedRepetition(
@@ -342,5 +380,5 @@ export function updateSpacedRepetition(
     updated.lapses = ((data.lapses as number) || 0) + 1;
   }
 
-  return matter.stringify(content, updated);
+  return stringifyNote(content, updated);
 }

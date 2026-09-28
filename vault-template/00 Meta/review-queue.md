@@ -9,6 +9,28 @@ Your systematic review dashboard. Install the **Dataview** plugin to see live qu
 
 ---
 
+## Due Today
+
+Reviewed ideas whose spaced-repetition date has come. (The web app's `/review` runs these first.)
+
+```dataview
+TABLE next_review_date, review_interval, difficulty
+FROM "20 Ideas"
+WHERE review_status = "reviewed" AND next_review_date <= date(today)
+SORT next_review_date ASC
+```
+
+## Predictions to Check
+
+Forecasts whose `verify_by` date has arrived. Check each against what actually happened.
+
+```dataview
+TABLE prediction, source_date, verify_by
+FROM "20 Ideas"
+WHERE prediction AND verify_by <= date(today) AND !prediction_outcome
+SORT verify_by ASC
+```
+
 ## Unreviewed Items (newest first)
 
 These need your attention. Read each one, then update `review_status` in the frontmatter.

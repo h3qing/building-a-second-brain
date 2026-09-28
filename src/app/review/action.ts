@@ -5,14 +5,21 @@ import { updateTag } from "next/cache";
 import { verifySession } from "@/lib/auth";
 import { getFileContent, updateFile, TREE_TAG } from "@/lib/github";
 import {
+  updatePredictionOutcome,
+  PREDICTION_OUTCOMES,
+  type PredictionOutcome,
   updateReviewStatus,
   updateSpacedRepetition,
   updateStarStatus,
   replaceInsight,
   type Difficulty,
 } from "@/lib/parser";
-import { applyReviewToQueueCache } from "@/lib/review-queue";
+import {
+  applyReviewToQueueCache,
+  applyCheckToQueueCache,
+} from "@/lib/review-queue";
 import { todayISO } from "@/lib/time";
+import { appendNote, MY_TAKE } from "@/lib/notes";
 
 export async function reviewAction(formData: FormData) {
   const isLoggedIn = await verifySession();
@@ -25,6 +32,9 @@ export async function reviewAction(formData: FormData) {
   const rawContent = formData.get("rawContent") as string;
   const customInsight = formData.get("customInsight") as string | null;
   const insightChanged = formData.get("insightChanged") === "true";
+  // Your own words on this idea (optional): a reaction, a use, or — for a
+  // contest — what you disagree with. Appended to the note's `## My Take`.
+  const myTake = ((formData.get("myTake") as string | null) ?? "").trim();
 
   if (!path || !action) redirect("/review");
 
@@ -33,9 +43,14 @@ export async function reviewAction(formData: FormData) {
   const srActions: Difficulty[] = ["easy", "medium", "hard", "forgot"];
   const isSR = srActions.includes(action as Difficulty);
   const isStar = action === "star" || action === "unstar";
+  // "verify-came-true" etc.: judging a prediction, not reviewing the idea.
+  const outcome = action.startsWith("verify-")
+    ? (action.slice("verify-".length) as PredictionOutcome)
+    : null;
+  const isVerify = !!outcome && PREDICTION_OUTCOMES.includes(outcome);
 
   const validAction =
-    isSR || isStar || action === "approve" || action === "contest";
+    isSR || isStar || isVerify || action === "approve" || action === "contest";
   if (!validAction) {
     redirect(returnTo || "/review");
     return;
@@ -53,7 +68,21 @@ export async function reviewAction(formData: FormData) {
   // Turn the current file contents into the committed version for this action.
   // Computed from whichever source we have (form-supplied or freshly read).
   const transform = (source: string): string => {
-    const base = applyInsight(source);
+    let base = applyInsight(source);
+    if (myTake && !isStar) {
+      base = appendNote(
+        base,
+        MY_TAKE,
+        today,
+        myTake,
+        action === "contest"
+          ? "contested"
+          : isVerify
+            ? `prediction ${outcome === "came-true" ? "came true" : outcome === "partly" ? "partly true" : "wrong"}`
+            : ""
+      );
+    }
+    if (isVerify) return updatePredictionOutcome(base, outcome!, today);
     if (isSR) return updateSpacedRepetition(base, action as Difficulty, today);
     if (isStar) return updateStarStatus(base, action === "star");
     return updateReviewStatus(
@@ -63,7 +92,10 @@ export async function reviewAction(formData: FormData) {
     );
   };
 
-  const message = `review: ${action} "${slug}"`;
+  // Prediction checks get their own prefix so review stats don't count them.
+  const message = isVerify
+    ? `verify: ${outcome} "${slug}"`
+    : `review: ${action} "${slug}"`;
 
   // Fast path with SHA from form
   if (sha) {
@@ -91,7 +123,8 @@ export async function reviewAction(formData: FormData) {
 
   // Keep the in-memory queue cache in step with the commit so the next card
   // render reflects this review immediately (status, dates, session position).
-  applyReviewToQueueCache(path, action, today);
+  if (isVerify) applyCheckToQueueCache(path, outcome!);
+  else applyReviewToQueueCache(path, action, today);
 
   redirect(returnTo || "/review");
 }

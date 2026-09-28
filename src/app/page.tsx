@@ -29,37 +29,37 @@ export default async function Home() {
         <div className="flex items-center gap-4 text-sm">
           <Link
             href="/"
-            className="text-foreground hover:text-accent transition-colors"
+            className="touch-target text-foreground hover:text-accent transition-colors"
           >
             home
           </Link>
           <Link
             href="/write"
-            className="text-muted hover:text-foreground transition-colors"
+            className="touch-target text-muted hover:text-foreground transition-colors"
           >
             write
           </Link>
           <Link
             href="/review"
-            className="text-muted hover:text-foreground transition-colors"
+            className="touch-target text-muted hover:text-foreground transition-colors"
           >
             review queue
           </Link>
           <Link
             href="/tensions"
-            className="text-muted hover:text-foreground transition-colors"
+            className="touch-target text-muted hover:text-foreground transition-colors"
           >
             tensions
           </Link>
           <a
             href="https://heqinghuang.com"
-            className="text-muted hover:text-foreground transition-colors"
+            className="touch-target text-muted hover:text-foreground transition-colors"
           >
             blog
           </a>
           <a
             href="https://github.com/h3qing/second-brain"
-            className="text-muted hover:text-foreground transition-colors"
+            className="touch-target text-muted hover:text-foreground transition-colors"
           >
             github
           </a>

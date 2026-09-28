@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getTensions } from "@/lib/tensions";
 import { OutboundLink } from "@/app/components/outbound-link";
+import { verifySession } from "@/lib/auth";
+import { takeSideAction } from "./action";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +12,9 @@ export const metadata = {
 };
 
 export default async function TensionsPage() {
-  const tensions = await getTensions();
+  const isOwner = await verifySession();
+  const tensions = await getTensions(isOwner);
+  const sided = tensions.filter((t) => t.mySide).length;
 
   return (
     <div className="space-y-10">
@@ -21,7 +25,7 @@ export default async function TensionsPage() {
           </h1>
           <Link
             href="/"
-            className="text-sm text-muted hover:text-foreground transition-colors"
+            className="touch-target text-sm text-muted hover:text-foreground transition-colors"
           >
             &larr; home
           </Link>
@@ -30,6 +34,11 @@ export default async function TensionsPage() {
           {tensions.length} places where your sources disagree. Taking a side is
           how reading turns into writing. Pick one and argue it.
         </p>
+        {isOwner && tensions.length > 0 && (
+          <p className="text-sm text-muted">
+            You&apos;ve taken a side on {sided} of {tensions.length}.
+          </p>
+        )}
       </header>
 
       {tensions.length === 0 ? (
@@ -42,6 +51,7 @@ export default async function TensionsPage() {
           {tensions.map((t) => (
             <article
               key={t.slug}
+              id={t.slug}
               className="border-t border-border pt-5 space-y-2"
             >
               <div className="flex items-baseline justify-between gap-4">
@@ -54,9 +64,10 @@ export default async function TensionsPage() {
                 </Link>
                 <Link
                   href={t.url}
-                  className="label whitespace-nowrap hover:text-foreground transition-colors"
+                  className="touch-target label whitespace-nowrap hover:text-foreground transition-colors"
                 >
-                  take a side &rarr;
+                  {/* Signed in, "take a side" is the box below; this just opens the concept. */}
+                  {isOwner ? "open concept" : "take a side"} &rarr;
                 </Link>
               </div>
               <p className="read">{t.text}</p>
@@ -83,6 +94,40 @@ export default async function TensionsPage() {
                     );
                   })}
                 </div>
+              )}
+              {isOwner && t.mySide && (
+                <div className="my-takes" style={{ marginTop: "0.75rem" }}>
+                  <p className="label">
+                    Your side{t.mySide.date && ` · ${t.mySide.date}`}
+                  </p>
+                  <p className="read">{t.mySide.text}</p>
+                </div>
+              )}
+              {isOwner && (
+                // <details> opens without JS — works on the Kindle too.
+                <details className="take-side">
+                  <summary className="label">
+                    {t.mySide ? "Update your side" : "Take a side"}
+                  </summary>
+                  <form action={takeSideAction} className="space-y-2">
+                    <input type="hidden" name="path" value={t.path} />
+                    <input
+                      type="hidden"
+                      name="returnTo"
+                      value={`/tensions#${encodeURIComponent(t.slug)}`}
+                    />
+                    <textarea
+                      name="side"
+                      className="insight-textarea"
+                      rows={3}
+                      required
+                      placeholder="Which source is right, or what they both miss. One or two sentences in your own words."
+                    />
+                    <button type="submit" className="btn btn-nav">
+                      Save my side
+                    </button>
+                  </form>
+                </details>
               )}
             </article>
           ))}

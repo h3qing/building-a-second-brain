@@ -144,7 +144,7 @@ Books / Articles / Podcasts
 | `/review/card` | Private | Card-based review with **active recall** (insight hidden until you reveal it) |
 | `/write` | Public | Concepts you've reviewed enough to write about |
 | `/write/[slug]` | Public | A writing brief: definition, tension, prompt, and source material |
-| `/tensions` | Public | Where your sources disagree, framed as "pick a side" |
+| `/tensions` | Public | Where your sources disagree, framed as "pick a side" (signed in, you can record your side) |
 
 ## Tools for turning knowledge into output
 
@@ -152,7 +152,10 @@ Collecting is the easy half. These close the loop to thinking and writing:
 
 - **Writing briefs (`/write`).** A concept becomes "ready to write" once enough reviewed ideas link to it. Open one and you get the definition, the cross-source tension, a synthesized prompt, and every linked idea (insight + quote), assembled to draft from. Copy as markdown or pull it via API.
 - **Active recall (`/review/card`).** Re-reviews hide the insight behind a Reveal button, so you recall it before checking yourself, then rate how well you did: Easy / Medium / Hard / Forgot, each button showing when the card would come back. Ideas carry a `## Recall` question written at extraction; the card asks it and hides everything that gives the answer away (title, highlight, source quote) until you reveal. Real recall, not passive re-reading.
-- **Tensions (`/tensions`).** A feed of concepts whose sources disagree. Taking a side is how reading turns into writing.
+- **Tensions (`/tensions`).** A feed of concepts whose sources disagree. Taking a side is how reading turns into writing, so signed in, each tension has a box for your position (saved to the concept's `## My Side`).
+- **Your own words (`## My Take`).** Any review can carry a line of your own: a reaction, where you'd use it, or (asked for on Contest) what you disagree with. Takes append to a human-owned section the AI never edits, come back on the card next time, and feed the writing brief, so "write in my voice" has your voice to start from. Private: public pages never show them.
+- **Connections.** After you reveal a card, it shows a reviewed idea from a *different* source under the same concept and asks: same idea, a twist, or a clash?
+- **Prediction check-ins.** Forecasts extracted from sources carry `prediction` + `verify_by`; on that date they show up on `/review` to be judged (came true / partly / didn't) with a line of evidence, and your calibration tally builds up over time.
 
 ## API
 

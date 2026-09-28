@@ -9,6 +9,8 @@ review_count: 0
 review_interval: 1
 next_review_date:
 difficulty:
+prediction: "一年之内国产芯片生态完全没有问题，剩下的只是产能问题"
+verify_by: 2027-05-20
 tags: [AI, cuda, tilelang, nvidia, huawei, deepseek, liang-wenfeng]
 ---
 

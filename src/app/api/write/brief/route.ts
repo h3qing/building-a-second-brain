@@ -6,7 +6,9 @@ export const dynamic = "force-dynamic";
 
 // GET /api/write/brief?concept=<slug>
 //   A writing brief for one concept: definition, tension, prompt, and every
-//   reviewed idea (insight + source quote). Pipe it to an LLM or write from it.
+//   reviewed idea (insight + source quote), plus your own side and takes —
+//   the endpoint is token-gated, so it's the private brief. Pipe it to an LLM
+//   or write from it.
 //   Auth: Authorization: Bearer <RECAP_TOKEN>  (or ?token=<RECAP_TOKEN>)
 //   ?format=json (default) | md | text
 export async function GET(req: NextRequest) {
@@ -32,7 +34,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const brief = await getWritingBrief(slug);
+  const brief = await getWritingBrief(slug, true);
   if (!brief) {
     return NextResponse.json({ error: "Concept not found" }, { status: 404 });
   }

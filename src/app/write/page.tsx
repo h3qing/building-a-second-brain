@@ -20,7 +20,7 @@ export default async function WritePage() {
           </h1>
           <Link
             href="/"
-            className="text-sm text-muted hover:text-foreground transition-colors"
+            className="touch-target text-sm text-muted hover:text-foreground transition-colors"
           >
             &larr; home
           </Link>

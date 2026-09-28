@@ -3,6 +3,7 @@ import Link from "next/link";
 import { findConceptBySlug } from "@/lib/content";
 import { formatDate, toISODate } from "@/lib/time";
 import { decodeSlug } from "@/lib/slug";
+import { verifySession } from "@/lib/auth";
 import { ContentViewTracker } from "@/app/components/content-view-tracker";
 
 export default async function ConceptPage({
@@ -11,7 +12,7 @@ export default async function ConceptPage({
   params: Promise<{ slug: string }>;
 }) {
   const slug = decodeSlug((await params).slug);
-  const concept = await findConceptBySlug(slug);
+  const concept = await findConceptBySlug(slug, await verifySession());
 
   if (!concept) notFound();
 
@@ -31,7 +32,7 @@ export default async function ConceptPage({
       <div>
         <Link
           href="/"
-          className="text-sm text-muted hover:text-foreground transition-colors"
+          className="touch-target text-sm text-muted hover:text-foreground transition-colors"
         >
           &larr; Knowledge Base
         </Link>

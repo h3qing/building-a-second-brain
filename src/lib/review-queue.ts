@@ -2,10 +2,12 @@ import { listFiles, getFilesContent } from "./github";
 import {
   parseFrontmatter,
   extractTitle,
+  extractRelatedConcepts,
   computeNextInterval,
   elapsedSince,
   type Difficulty,
 } from "./parser";
+import { extractSection } from "./markdown";
 import { toISODate, addDaysISO } from "./time";
 
 export interface QueueItem {
@@ -21,6 +23,14 @@ export interface QueueItem {
   difficulty?: string; // last rating: easy | medium | hard | forgot
   lapses?: number;
   starred?: boolean;
+  concepts: string[]; // Related Concepts, normalized (see conceptKey)
+  insight: string; // short excerpt, for connection prompts
+  // Time-bound claims: what was predicted, when it can be judged, and — once
+  // checked — how it turned out.
+  prediction?: string;
+  verifyBy?: string;
+  sourceDate?: string;
+  predictionOutcome?: string;
 }
 
 export interface CategorizedQueue {
@@ -28,6 +38,16 @@ export interface CategorizedQueue {
   contested: QueueItem[];
   reviewed: QueueItem[];
   dueForReview: QueueItem[];
+}
+
+// "[[10 Notes/x/Negotiation|negotiation]]" and "Negotiation" name the same
+// concept: compare by lowercased filename.
+export function conceptKey(link: string): string {
+  return (link.split("|")[0].split("/").pop() || "").trim().toLowerCase();
+}
+
+function excerpt(text: string, max: number): string {
+  return text.length > max ? text.slice(0, max - 1).trimEnd() + "…" : text;
 }
 
 // Short-lived in-memory cache. The card flow recomputes the queue on every card
@@ -60,6 +80,31 @@ const recentReviews = new Map<string, ReviewPatch>();
 // moment the fetched data catches up, so the long TTL never masks real edits.
 const PATCH_TTL = 960_000; // 16 min — tree revalidate window + margin
 
+// The same read-after-write bridge for prediction checks, so a just-judged
+// prediction doesn't reappear as "to check" on the next stale read.
+const recentChecks = new Map<string, { outcome: string; at: number }>();
+
+function overlayRecentChecks(items: QueueItem[]): void {
+  const now = Date.now();
+  for (const [path, check] of recentChecks) {
+    const item = items.find((i) => i.path === path);
+    if (now - check.at > PATCH_TTL || item?.predictionOutcome === check.outcome) {
+      recentChecks.delete(path);
+    } else if (item) {
+      item.predictionOutcome = check.outcome;
+    }
+  }
+}
+
+export function applyCheckToQueueCache(path: string, outcome: string): void {
+  const item = cache?.items.find((i) => i.path === path);
+  if (item && cache) {
+    item.predictionOutcome = outcome;
+    cache.at = Date.now();
+  }
+  recentChecks.set(path, { outcome, at: Date.now() });
+}
+
 function overlayRecentReviews(items: QueueItem[]): void {
   const now = Date.now();
   for (const [path, patch] of recentReviews) {
@@ -82,8 +127,8 @@ function overlayRecentReviews(items: QueueItem[]): void {
     }
 
     item.status = patch.status;
+    item.reviewedDate = patch.reviewedDate;
     if (!patch.isContest) {
-      item.reviewedDate = patch.reviewedDate;
       item.reviewCount = patch.reviewCount;
       item.reviewInterval = patch.reviewInterval;
       item.nextReviewDate = patch.nextReviewDate;
@@ -141,6 +186,18 @@ export async function getReviewQueue(forceFresh = false): Promise<QueueItem[]> {
           : undefined,
       lapses: typeof frontmatter.lapses === "number" ? frontmatter.lapses : 0,
       starred: frontmatter.starred === true,
+      concepts: extractRelatedConcepts(content).map(conceptKey),
+      insight: excerpt(extractSection(content, "Insight"), 160),
+      prediction:
+        typeof frontmatter.prediction === "string" && frontmatter.prediction.trim()
+          ? frontmatter.prediction.trim()
+          : undefined,
+      verifyBy: toISODate(frontmatter.verify_by),
+      sourceDate: toISODate(frontmatter.source_date),
+      predictionOutcome:
+        typeof frontmatter.prediction_outcome === "string"
+          ? frontmatter.prediction_outcome
+          : undefined,
     });
   }
 
@@ -151,6 +208,7 @@ export async function getReviewQueue(forceFresh = false): Promise<QueueItem[]> {
   // Bridge GitHub's read-after-write lag: re-apply any just-reviewed items the
   // fresh read hasn't caught up to yet, so they don't resurface as "due".
   overlayRecentReviews(items);
+  overlayRecentChecks(items);
 
   cache = { items, at: now };
   return items;
@@ -257,6 +315,89 @@ export function forecast(
   });
 }
 
+// Predictions whose check-by date has arrived and that haven't been judged,
+// oldest deadline first.
+export function predictionsDue(items: QueueItem[], today: string): QueueItem[] {
+  return items
+    .filter(
+      (i) => i.prediction && i.verifyBy && i.verifyBy <= today && !i.predictionOutcome
+    )
+    .sort((a, b) => (a.verifyBy || "").localeCompare(b.verifyBy || ""));
+}
+
+// Your calibration so far: how the predictions you kept turned out.
+export function predictionTally(items: QueueItem[], today: string) {
+  const withClaim = items.filter((i) => i.prediction && i.verifyBy);
+  const open = withClaim.filter((i) => !i.predictionOutcome);
+  const count = (o: string) =>
+    withClaim.filter((i) => i.predictionOutcome === o).length;
+  return {
+    cameTrue: count("came-true"),
+    partly: count("partly"),
+    wrong: count("wrong"),
+    open: open.length,
+    nextCheck: open
+      .map((i) => i.verifyBy!)
+      .filter((d) => d > today)
+      .sort()[0],
+  };
+}
+
+export interface Connection {
+  item: QueueItem;
+  concept: string; // the shared concept, as the current card names it
+  sameSource: boolean;
+}
+
+// Ideas that share a concept with this card, for a "how do these relate?"
+// prompt after reveal. Reviewed ideas from *other* sources come first — that
+// cross-source link is the synthesis the concept graph exists for; same-source
+// siblings only fill in when nothing else shares a concept. The pick varies
+// by card but is stable across reloads.
+export function findConnections(
+  items: QueueItem[],
+  current: { path: string; source: string; concepts: string[] },
+  max = 2
+): Connection[] {
+  const mine = new Map(current.concepts.map((c) => [conceptKey(c), c]));
+  if (mine.size === 0) return [];
+
+  const scored = items
+    .filter((i) => i.path !== current.path && i.status === "reviewed")
+    .map((i) => {
+      // Shared concepts in this card's order, so the one named is predictable.
+      const shared = [...mine.keys()].filter((k) => i.concepts.includes(k));
+      return {
+        item: i,
+        shared,
+        sameSource: i.source === current.source,
+        tiebreak: hashString(current.path + "\u0000" + i.path),
+      };
+    })
+    .filter((x) => x.shared.length > 0)
+    .sort(
+      (a, b) =>
+        Number(a.sameSource) - Number(b.sameSource) ||
+        b.shared.length - a.shared.length ||
+        a.tiebreak - b.tiebreak
+    );
+
+  return scored.slice(0, max).map((x) => ({
+    item: x.item,
+    concept: mine.get(x.shared[0]) || x.shared[0],
+    sameSource: x.sameSource,
+  }));
+}
+
+function hashString(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
 // Patch the cached queue after a review commit so the very next card render
 // (within the TTL) sees the new status. Without this the just-reviewed item
 // re-appears in its old section and the session position resets to 1.
@@ -277,7 +418,10 @@ export function applyReviewToQueueCache(
   }
 
   if (action === "contest") {
+    // The file gets reviewed_date too; mirror it so a contested new idea
+    // counts against today's new-card allowance right away.
     item.status = "contested";
+    item.reviewedDate = today;
   } else if (action === "approve") {
     item.status = "reviewed";
     item.reviewedDate = today;
